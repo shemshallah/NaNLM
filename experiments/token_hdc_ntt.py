@@ -83,6 +83,14 @@ def main() -> int:
     for ctx, nxt, weight in recs:
         t = unpack(ctx, 3)
         teacher[(t[0], t[1], t[2])][nxt] += weight
+    teacher2: dict[tuple[int, int], dict[int, int]] = defaultdict(
+        lambda: defaultdict(int)
+    )
+    teacher1: dict[int, dict[int, int]] = defaultdict(lambda: defaultdict(int))
+    for (t0, t1, t2), bucket in teacher.items():
+        for nxt, weight in bucket.items():
+            teacher2[(t1, t2)][nxt] += weight
+            teacher1[t2][nxt] += weight
 
     # Token text/class cache for binding-operator selection.
     text_cache: dict[int, str] = {}
@@ -100,7 +108,8 @@ def main() -> int:
     rng = np.random.default_rng(args.seed)
     codebook = (rng.random((len(unique_ids), args.dim)) < args.density)
     pos = (rng.random((3, args.dim)) < args.pos_density)
-    n_by_class = ({0: 6, 1: 6, 2: 12, 3: 9}
+    # Sparse-preserving gates only. n=9/15 contain dense complements.
+    n_by_class = ({0: 6, 1: 6, 2: 12, 3: 10}
                   if args.mode == "regime" else {0: 6, 1: 6, 2: 6, 3: 6})
 
     def encode(ctx: tuple[int, int, int]) -> np.ndarray:
@@ -132,58 +141,67 @@ def main() -> int:
     # Cache exact/nearest decisions.
     eval_n = 0
     eval_bytes = 0
-    exact_n = nearest_n = 0
+    exact3 = exact2 = exact1 = nearest_n = 0
     teacher_n = 0
     teacher_bytes = 0
-    correct = 0
-    bits = 0.0
+    correct_t = 0
+    bits_t = 0.0
     correct_ng = 0
     bits_ng = 0.0
     correct_h = 0
     bits_h = 0.0
 
+    def bucket_prob(bucket: dict[int, int], token: int) -> float:
+        total = sum(bucket.values())
+        return (bucket.get(token, 0) + 0.1) / (total + 0.1 * vocab)
+
     for i in range(train_tokens, len(ids) - 1):
         ctx = (ids[i - 2], ids[i - 1], ids[i])
         actual = ids[i + 1]
+        b3 = teacher.get(ctx)
+        b2 = teacher2.get((ctx[1], ctx[2]))
+        b1 = teacher1.get(ctx[2])
+
         q = encode(ctx)
         qp = pack_matrix(q[None, :])[0]
         d = np.bitwise_count(P ^ qp).sum(axis=1)
         best_i = int(np.argmin(d))
-        best_key = keys[best_i]
         dist_frac = float(d[best_i]) / args.dim
-        bucket = teacher.get(ctx)
-        if bucket:
-            exact_n += 1
-            pred_bucket = bucket
+
+        use_bucket = None
+        if b3:
+            exact3 += 1
+            use_bucket = b3
+        elif b2:
+            exact2 += 1
+            use_bucket = b2
+        elif b1:
+            exact1 += 1
+            use_bucket = b1
         elif dist_frac <= args.nearest_threshold:
             nearest_n += 1
-            pred_bucket = teacher[best_key]
-        else:
-            pred_bucket = None
+            use_bucket = teacher[keys[best_i]]
 
-        # Teacher/hybrid probability
-        if pred_bucket:
+        if use_bucket:
             teacher_n += 1
             teacher_bytes += len(tok_text(actual).encode("utf-8", errors="replace"))
-            total = sum(pred_bucket.values())
-            p_t = (pred_bucket.get(actual, 0) + 0.1) / (total + 0.1 * vocab)
-            best_t = max(pred_bucket.items(), key=lambda kv: kv[1])[0]
+            p_t = bucket_prob(use_bucket, actual)
+            best_t = max(use_bucket.items(), key=lambda kv: kv[1])[0]
             if best_t == actual:
-                correct += 1
+                correct_t += 1
+            bits_t += -math.log2(p_t)
         else:
             p_t = None
             best_t = None
 
-        # Token n-gram
-        c1 = ids[i]
-        c2 = (ids[i - 1] << 18) | ids[i]
-        c3 = (ids[i - 2] << 36) | (ids[i - 1] << 18) | ids[i]
+        c1 = ctx[2]
+        c2 = (ctx[1] << 18) | ctx[2]
+        c3 = (ctx[0] << 36) | (ctx[1] << 18) | ctx[2]
         p_ng = hierarchical_prob(
             actual, g3.get(c3), t3.get(c3, 0), g2.get(c2), t2.get(c2, 0),
             g1.get(c1), t1.get(c1, 0), uni, utot, vocab,
         )
         bits_ng += -math.log2(p_ng)
-        # top-1 ngram
         cands = set(uni.keys()) if len(uni) < 64 else {
             k for k, _ in sorted(uni.items(), key=lambda kv: kv[1], reverse=True)[:32]
         }
@@ -196,14 +214,12 @@ def main() -> int:
         )) if cands else 0
         if best_ng == actual:
             correct_ng += 1
-        bits_ng += 0.0
 
         if p_t is None:
             p_h, best_h = p_ng, best_ng
         else:
             p_h = args.teacher_weight * p_t + (1.0 - args.teacher_weight) * p_ng
             best_h = best_t
-        bits += -math.log2(p_t) if p_t is not None else 0.0
         bits_h += -math.log2(p_h)
         if best_h == actual:
             correct_h += 1
@@ -216,10 +232,12 @@ def main() -> int:
         print(f"{name}: top1={100.0*c/n:.2f}% bpt={b/n:.4f} "
               f"bpc={b/nbytes:.4f}")
 
+    cov = exact3 + exact2 + exact1
     print(f"token_hdc_ntt: eval_tokens={eval_n} eval_bytes={eval_bytes} "
-          f"exact={exact_n} nearest={nearest_n} "
-          f"coverage={100.0*(exact_n+nearest_n)/max(1,eval_n):.2f}%")
-    show("hdc_teacher", correct, bits, teacher_n, teacher_bytes)
+          f"exact3={exact3} exact2={exact2} exact1={exact1} nearest={nearest_n} "
+          f"coverage3={100.0*exact3/max(1,eval_n):.2f}% "
+          f"coverage123={100.0*cov/max(1,eval_n):.2f}%")
+    show("teacher_backoff", correct_t, bits_t, teacher_n, teacher_bytes)
     show("token_ngram", correct_ng, bits_ng, eval_n, eval_bytes)
     show("hdc_teacher_plus_ngram", correct_h, bits_h, eval_n, eval_bytes)
     return 0

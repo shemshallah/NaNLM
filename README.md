@@ -152,6 +152,7 @@ The tests verify the parts that must not drift:
 - [Alien architecture](docs/ALIEN.md) — self-modifying regimes, mirror law, and what failed.
 - [Heterogeneous layers](docs/LAYERS.md) — one word, different interpretations per layer.
 - [Layer test plan](docs/LAYER_TESTS.md) — per-layer NaN use, tests, and stop conditions.
+- [NaN LUT / Regime Network](docs/LUT_REGIME.md) — the special architecture candidate and its decisive tests.
 - [Model 0](docs/MODEL_0.md) — a concrete, buildable first model.
 - [M2 plan](docs/M2_PLAN.md) — context binding, a real corpus, and negative gates.
 - [C adapter](docs/ADAPTER.md) — the S6 boundary and the `.nan` compiler.

@@ -129,6 +129,7 @@ The tests verify the parts that must not drift:
 
 - [NaN16 study](docs/NAN16_STUDY.md) — the word format and its constraints, with provenance.
 - [Foundations](docs/FOUNDATIONS.md) — the full design argument.
+- [Keystone and supports](docs/KEYSTONE.md) — the stable core and the replaceable model parts.
 - [Model 0](docs/MODEL_0.md) — a concrete, buildable first model.
 - [M2 plan](docs/M2_PLAN.md) — context binding, a real corpus, and negative gates.
 - [C adapter](docs/ADAPTER.md) — the S6 boundary and the `.nan` compiler.
@@ -136,6 +137,7 @@ The tests verify the parts that must not drift:
 - [Roadmap](docs/ROADMAP.md) — what ships first, and what does not.
 - [Community plan](docs/COMMUNITY.md) — launch sequence, hooks, and anti-patterns.
 - [Evidence](docs/EVIDENCE.md) — the gates that have actually run.
+- [Research log](docs/RESEARCH_LOG.md) — experiment matrix, including the negative results.
 - [M1 retrospective](docs/M1_RETROSPECTIVE.md) — what the first pipeline proved, and did not.
 
 ## Relationship to NaN16

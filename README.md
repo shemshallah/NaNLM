@@ -30,9 +30,9 @@ experiment with a measurable baseline.
 **Status:** M1, M2a, and the byte-level M2b structural base pass. The NaN16
 runtime binds three codebook vectors with position vectors, bundles them by
 majority, hashes the encoded query, and classifies it. The 2,048-bit
-byte-level model runs 32 held-out contexts on `nanlm_vm` in ~70M steps and
+byte-level model runs 32 held-out contexts on `nanlm_vm` in ~140M steps and
 matches the C adapter on every predicted byte and query hash. The honest
-quality number is **25% top-1 vs 50% for an order-3 n-gram**; this is a
+quality number is **34.4% top-1 vs 50% for an order-3 n-gram**; this is a
 structural base, not a competitive LM.
 
 ## What this is
@@ -67,13 +67,13 @@ table below describes the current M2b base.
 | vector dimension | 2,048 bits = 64 NaN words (8,192 is the next scale) |
 | vocabulary | byte-level, 256 symbols |
 | context | 3 bound bytes, majority-bundled |
-| memory | 4 prototypes per next-byte class |
+| memory | 8 prototypes per next-byte class |
 | similarity | Hamming distance / popcount |
 | training | integer bit-sliced counters in the C adapter |
 | inference | NaN16 `BOOL`, `ADD`, `SHL`, `SHR`, `LD`, `ST`, `JMP` |
 | arithmetic | integer only; no FP in the model |
-| model size | ~0.7 MB of NaN words including codebook |
-| quality | 25% top-1 / order-3 n-gram 50% on the Alice excerpt |
+| model size | ~1.2 MB of NaN words including codebook |
+| quality | 34.4% top-1 / order-3 n-gram 50% on the Alice excerpt |
 
 The point is not the score. The point is that every weight is a gated NaN
 word, every operation is a Boolean function, and the whole model can be
@@ -114,7 +114,7 @@ executed by `build/nanlm_vm`. No external tree or native runtime is required.
 The first model is a 2,048-bit, 16-class synthetic prototype classifier. It is
 a pipeline proof. M2a adds the actual HDC operations:
 `v_i = C[b_i] XOR P[i]`, `q = majority(v_0,v_1,v_2)`. M2b replaces the synthetic
-classes with 256 byte classes, four prototypes per byte, and a held-out Alice
+classes with 256 byte classes, eight prototypes per byte, and a held-out Alice
 excerpt. The n-gram baseline wins today; the model card says so.
 
 The tests verify the parts that must not drift:

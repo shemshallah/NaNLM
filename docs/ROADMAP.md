@@ -48,10 +48,10 @@ language model.
 - [x] M2a: query-vector FNV hash gate; class + hash must match.
 - [x] M2a: negative gates for zeroed positions, swapped prototypes, and step
       starvation.
-- [x] M2b base: 2,048-bit, 256-byte vocabulary, 4 prototypes per byte.
+- [x] M2b base: 2,048-bit, 256-byte vocabulary, 8 prototypes per byte.
 - [x] M2b base: codebook, position vectors, prototypes, held-out Alice excerpt.
 - [x] M2b base: order-3 n-gram baseline.
-- [x] M2b base: held-out top-1 accuracy (25% HDC vs 50% n-gram).
+- [x] M2b base: held-out top-1 accuracy (34.4% HDC vs 50% n-gram).
 - [x] M2b base: `tools/build_lm.sh` end-to-end gate.
 - [ ] M2b next: 8,192-bit scale.
 - [ ] M2b next: seal A/B/C and loader verification.

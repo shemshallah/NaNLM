@@ -18,8 +18,8 @@ extern "C" {
 #endif
 
 #define NANLM_LM_CTX 3u
-#define NANLM_LM_CLUSTERS 4u
-#define NANLM_LM_PROTO_SHIFT 2u
+#define NANLM_LM_CLUSTERS 8u
+#define NANLM_LM_MAX_CLUSTERS 16u
 
 typedef struct {
     uint32_t dim;
@@ -47,6 +47,9 @@ typedef struct {
 
 nanlm_lm_model *nanlm_lm_model_new(uint32_t dim, uint32_t vocab,
                                    uint32_t nqueries);
+nanlm_lm_model *nanlm_lm_model_new_clusters(uint32_t dim, uint32_t vocab,
+                                            uint32_t nqueries,
+                                            uint32_t clusters);
 void nanlm_lm_model_free(nanlm_lm_model *m);
 
 /* Train on data[0..len). The first train_frac of bytes is training; the rest

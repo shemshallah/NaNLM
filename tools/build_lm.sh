@@ -11,6 +11,7 @@ VM="$ROOT/build/nanlm_vm"
 CORPUS=${CORPUS:-"$ROOT/data/alice_excerpt.txt"}
 DIM=${DIM:-2048}
 QUERIES=${QUERIES:-32}
+CLUSTERS=${CLUSTERS:-8}
 
 mkdir -p "$ROOT/models" "$ROOT/build"
 make -C "$ROOT" build/nanlm_lm_train build/nanlm_asm build/nanlm_vm >/dev/null
@@ -20,13 +21,14 @@ run_model() {
     shift
     "$ROOT/build/nanlm_lm_train" \
         --corpus "$CORPUS" --dim "$DIM" --queries "$QUERIES" \
+        --clusters "$CLUSTERS" \
         --out "$ROOT/build/$name.nas" \
         --expected "$ROOT/build/$name.expected" \
         --manifest "$ROOT/build/$name.manifest" "$@" \
         > "$ROOT/build/$name.log" 2>&1
     sh "$ROOT/tools/check_labels.sh" "$ROOT/build/$name.nas"
     "$ASM" "$ROOT/build/$name.nas" "$ROOT/build/$name.nan"
-    "$VM" --img "$ROOT/build/$name.nan" --steps 150000000 \
+    "$VM" --img "$ROOT/build/$name.nan" --steps 250000000 \
         > "$ROOT/build/$name.out" 2> "$ROOT/build/$name.err" || true
     if ! grep -q "rc=3, .*trap=''" "$ROOT/build/$name.err"; then
         echo "build_lm: $name did not halt cleanly" >&2

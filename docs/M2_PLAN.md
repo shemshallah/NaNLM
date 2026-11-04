@@ -19,10 +19,10 @@ prototypes, and step starvation all fail the differential gate.
 
 M2b results on the 30 KB Alice excerpt:
 
-- 25% top-1 vs 50% for an order-3 n-gram;
+- 34.4% top-1 vs 50% for an order-3 n-gram;
 - n-gram 3.78 bits/byte; HDC probability calibration is not implemented;
 - the runtime matches the C adapter on every predicted byte and hash;
-- ~70M VM steps for 32 held-out contexts.
+- ~140M VM steps for 32 held-out contexts.
 
 ## M2a — force the runtime to use binding and bundling
 
@@ -71,20 +71,20 @@ Switch the vocabulary to 256 bytes and use a real text corpus.
 | context | 3 bytes | 3 bytes |
 | codebook | 256 × 64 = 16,384 words | 65,536 words |
 | positions | 3 × 64 = 192 words | 768 words |
-| prototypes | 256 × 4 × 64 = 65,536 words | 262,144 words |
+| prototypes | 256 × 8 × 64 = 131,072 words | 256 × 8 × 256 = 524,288 words |
 | query set | 32 × 3 ids | 64 × 3 ids |
-| total | ~82k words = 0.66 MB | ~1.18 MB+ |
+| total | ~148k words = 1.18 MB | ~2.4 MB+ |
 
 ### Training
 
 1. Split corpus into train/validation by byte offset, not by random shuffle.
 2. For each position `t` with at least 3 bytes of context:
    - encode `(x[t-2], x[t-1], x[t])` into a query vector;
-   - choose a prototype bucket from the query hash;
+   - choose one of 8 prototype buckets from the query hash;
    - increment bit-sliced counters for `(next byte, bucket)`.
 3. Prototype bit = majority of counters.
-4. Four prototypes per byte are interleaved; the runtime returns
-   `prototype_index >> 2` as the byte.
+4. Eight prototypes per byte are interleaved; the runtime returns
+   `prototype_index >> 3` as the byte.
 5. Evaluate on held-out bytes.
 
 This is an order-3 HDC associative memory. It is not backprop. It may lose to a
@@ -179,8 +179,8 @@ A gate that cannot fail is not a check. M2 must include:
 
 1. **Shuffled labels:** query classes are not emitted in class order, so a
    runtime that returns `query_index % classes` fails.
-2. **Swapped prototypes:** swap prototypes 0 and 1 after training; the
-   differential test must fail.
+2. **Swapped prototypes:** swap two prototypes that occur in the query
+   predictions after training; the differential test must fail.
 3. **Broken encoder:** an encoder that ignores positions must produce a
    different query and fail the exact-vector gate.
 4. **Seal corruption:** flip one payload byte; the loader must reject.

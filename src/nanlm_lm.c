@@ -40,20 +40,30 @@ static size_t upper_key(const Pair *p, size_t n, uint32_t key) {
 
 nanlm_lm_model *nanlm_lm_model_new(uint32_t dim, uint32_t vocab,
                                    uint32_t nqueries) {
+    return nanlm_lm_model_new_clusters(dim, vocab, nqueries,
+                                       NANLM_LM_CLUSTERS);
+}
+
+nanlm_lm_model *nanlm_lm_model_new_clusters(uint32_t dim, uint32_t vocab,
+                                            uint32_t nqueries,
+                                            uint32_t clusters) {
     nanlm_lm_model *m;
-    uint32_t i;
+    uint32_t i, shift = 0;
 
     if (dim == 0 || (dim % 32u) != 0 || dim > 65504u || vocab == 0 ||
-        vocab > 256u || nqueries == 0 || nqueries > 65535u) {
+        vocab > 256u || nqueries == 0 || nqueries > 65535u ||
+        clusters == 0 || clusters > NANLM_LM_MAX_CLUSTERS ||
+        (clusters & (clusters - 1u)) != 0) {
         return NULL;
     }
+    while ((1u << shift) < clusters) shift++;
     m = (nanlm_lm_model *)calloc(1, sizeof(*m));
     if (!m) return NULL;
     m->dim = dim;
     m->words = dim / 32u;
     m->vocab = vocab;
-    m->clusters = NANLM_LM_CLUSTERS;
-    m->proto_shift = NANLM_LM_PROTO_SHIFT;
+    m->clusters = clusters;
+    m->proto_shift = shift;
     m->nqueries = nqueries;
     m->codebook = (nanlm_vec **)calloc(vocab, sizeof(*m->codebook));
     m->positions = (nanlm_vec **)calloc(NANLM_LM_CTX, sizeof(*m->positions));
@@ -282,7 +292,7 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
     /* HDC top-1 and a diagnostic softmax bits/byte. The emitted expected
      * class is the C model's prediction, not the corpus ground truth. */
     for (qi = 0; qi < m->nqueries; qi++) {
-        double scores[256 * NANLM_LM_CLUSTERS];
+        double scores[256 * NANLM_LM_MAX_CLUSTERS];
         double maxs = -1e300, sum = 0.0;
         uint32_t got = 0;
         if (nanlm_lm_predict(m, m->queries[qi], &got) != 0) {

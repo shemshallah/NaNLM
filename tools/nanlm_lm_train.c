@@ -8,7 +8,7 @@ static void usage(const char *argv0) {
     fprintf(stderr,
             "usage: %s [--corpus FILE] [--out FILE] [--expected FILE]\n"
             "          [--manifest FILE] [--dim BITS] [--queries N]\n"
-            "          [--train-frac F] [--seed HEX]\n"
+            "          [--train-frac F] [--seed HEX] [--clusters N]\n"
             "          [--zero-positions] [--swap01] [--swap-predicted]\n",
             argv0);
 }
@@ -62,6 +62,7 @@ int main(int argc, char **argv) {
     const char *manifest_path = "models/nanlm_lm.manifest";
     uint32_t dim = 1024;
     uint32_t nqueries = 32;
+    uint32_t clusters = NANLM_LM_CLUSTERS;
     double train_frac = 0.85;
     uint64_t seed = 0x4E414E4C4D4C4D01ull;
     int zero_positions = 0;
@@ -82,6 +83,7 @@ int main(int argc, char **argv) {
         else if (strcmp(a, "--manifest") == 0 && v) { manifest_path = v; i++; }
         else if (strcmp(a, "--dim") == 0 && v) { if (parse_u32(v, &dim)) return 2; i++; }
         else if (strcmp(a, "--queries") == 0 && v) { if (parse_u32(v, &nqueries)) return 2; i++; }
+        else if (strcmp(a, "--clusters") == 0 && v) { if (parse_u32(v, &clusters)) return 2; i++; }
         else if (strcmp(a, "--train-frac") == 0 && v) { train_frac = strtod(v, NULL); i++; }
         else if (strcmp(a, "--seed") == 0 && v) { if (parse_u64(v, &seed)) return 2; i++; }
         else if (strcmp(a, "--zero-positions") == 0) { zero_positions = 1; }
@@ -101,7 +103,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "cannot read corpus %s\n", corpus);
         return 1;
     }
-    m = nanlm_lm_model_new(dim, 256, nqueries);
+    m = nanlm_lm_model_new_clusters(dim, 256, nqueries, clusters);
     if (!m) {
         fprintf(stderr, "model allocation failed\n");
         free(data);
@@ -142,8 +144,8 @@ int main(int argc, char **argv) {
         goto done;
     }
 
-    printf("nanlm-lm: dim=%u vocab=%u queries=%u context=%u\n", m->dim,
-           m->vocab, m->nqueries, NANLM_LM_CTX);
+    printf("nanlm-lm: dim=%u vocab=%u clusters=%u queries=%u context=%u\n",
+           m->dim, m->vocab, m->clusters, m->nqueries, NANLM_LM_CTX);
     printf("train_bytes=%u val_bytes=%u train_frac=%.3f\n", m->train_bytes,
            m->val_bytes, train_frac);
     printf("hdc_top1=%.2f%% ngram_top1=%.2f%%\n", m->hdc_top1,

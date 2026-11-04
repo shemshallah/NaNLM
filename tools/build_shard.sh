@@ -6,7 +6,7 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CORPUS=${CORPUS:-"$ROOT/data/alice_excerpt.txt"}
-TMP=${TMPDIR:-/data/data/com.termux/files/usr/tmp/opencode}
+TMP=${TMPDIR:-"$ROOT/build/shard_tmp"}
 mkdir -p "$TMP" "$ROOT/build"
 make -C "$ROOT" build/nanlm_shard >/dev/null
 

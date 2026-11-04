@@ -64,3 +64,27 @@ learned regime selection, and recency-graded slots.
 - then emit a `.nas` runtime.
 
 Do not call this a token-level win yet.
+
+## Teacher-integrated token HDC
+
+`experiments/token_hdc_ntt.py` replaces the word-token corpus with:
+
+- Qwen token IDs;
+- the NTT1 token teacher shard;
+- sparse token/position HDC codes;
+- `BOOL.n` binding by token class;
+- one prototype per teacher context;
+- exact teacher lookup when the context is known;
+- nearest HDC prototype when it is not;
+- hierarchical token n-gram backoff;
+- full held-out top-1, BPT, byte BPC, coverage, and model bits.
+
+Run on Kaggle (no GPU):
+
+```python
+!cd /kaggle/working/NaNLM && python3 experiments/token_hdc_ntt.py --ntt /kaggle/working/qwen7b_tokens.ntt --corpus /kaggle/working/NaNLM/data/alice_excerpt.txt --model Qwen/Qwen2.5-7B-Instruct --dim 2048 --mode regime
+```
+
+This is the first test that can directly compare the compact token HDC memory
+against the 2.4161 BPC teacher/backoff lookup. Do not promote it until it pays
+for its model bits and beats the token n-gram on the same held-out tokens.

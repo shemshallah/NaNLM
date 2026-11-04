@@ -123,9 +123,12 @@ def main() -> int:
     prototypes = np.stack([encode(k) for k in keys])
     P = pack_matrix(prototypes)
     labels = {k: max(teacher[k].items(), key=lambda kv: kv[1])[0] for k in keys}
+    dense_bits = int(P.size * 64)
+    active_bits = int(np.bitwise_count(P).sum())
     print(f"token_hdc_ntt: mode={args.mode} dim={args.dim} "
-          f"contexts={len(keys)} model_bits={len(keys) * args.dim} "
-          f"active={100.0 * float(np.bitwise_count(P).sum()) / max(1, P.size * 64):.2f}%")
+          f"contexts={len(keys)} dense_model_bits={dense_bits} "
+          f"active_bits={active_bits} "
+          f"active={100.0 * active_bits / max(1, dense_bits):.2f}%")
 
     # Token n-gram fallback.
     g1, g2, g3 = defaultdict(lambda: defaultdict(int)), \
@@ -237,9 +240,21 @@ def main() -> int:
           f"exact3={exact3} exact2={exact2} exact1={exact1} nearest={nearest_n} "
           f"coverage3={100.0*exact3/max(1,eval_n):.2f}% "
           f"coverage123={100.0*cov/max(1,eval_n):.2f}%")
+    # Rough model-size accounting. Dense prototypes, sparse coordinates,
+    # top-8 next-token counts, and the teacher shard are all reported.
+    dense_bytes = (dense_bits + 7) // 8
+    coord_bits = active_bits * (math.ceil(math.log2(args.dim)) + 1)
+    count_bits = len(keys) * 8 * (18 + 16)
+    sparse_bytes = (coord_bits + count_bits + 7) // 8
+    teacher_bytes_all = len(recs) * 16
     show("teacher_backoff", correct_t, bits_t, teacher_n, teacher_bytes)
     show("token_ngram", correct_ng, bits_ng, eval_n, eval_bytes)
     show("hdc_teacher_plus_ngram", correct_h, bits_h, eval_n, eval_bytes)
+    print(f"model_size: dense={dense_bytes} B sparse_coords+top8={sparse_bytes} B "
+          f"teacher_shard={teacher_bytes_all} B")
+    print(f"hutter_total_bpc: dense={(bits_h + 8.0 * dense_bytes) / max(1, eval_bytes):.4f} "
+          f"sparse={(bits_h + 8.0 * sparse_bytes) / max(1, eval_bytes):.4f} "
+          f"with_teacher_shard={(bits_h + 8.0 * (sparse_bytes + teacher_bytes_all)) / max(1, eval_bytes):.4f}")
     return 0
 
 

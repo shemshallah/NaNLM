@@ -88,3 +88,30 @@ Run on Kaggle (no GPU):
 This is the first test that can directly compare the compact token HDC memory
 against the 2.4161 BPC teacher/backoff lookup. Do not promote it until it pays
 for its model bits and beats the token n-gram on the same held-out tokens.
+
+## Corrected teacher-integrated result
+
+After sparse truth tables and 2/1-token teacher backoff:
+
+| mode | active | exact3 | any teacher | teacher backoff BPC | token ngram BPC | hybrid BPC | hybrid top-1 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| regime | 0.69% | 7.31% | 81.45% | 3.1960 | 2.7324 | 2.4177 | 10.17% |
+| fixed | 2.25% | 7.31% | 81.45% | 3.1217 | 2.7324 | **2.4069** | 10.70% |
+
+The sparse truth-table fix dropped regime active fraction from 83% to 0.69%.
+The 2/1 teacher backoff raised teacher coverage from 7.3% to 81.45%.
+
+This matches the **2.4161 BPC** token lookup target. But it is not yet a compact
+student:
+
+- the 2.40 BPC hybrid is dominated by the exact/backoff teacher lookup;
+- HDC nearest is used for only 208 of 1,121 eval tokens;
+- prototypes are 11,857,920 dense bits (1.48 MB) at 2,048 dimensions;
+- the teacher lookup table is still present in the evaluator.
+
+Dense model accounting on the 4,476-byte held-out stream is ~2,650 BPC before
+teacher counts. This is not Pareto. The next compression target is the teacher
+table and prototype storage, not more dimensions.
+
+Fixed binding beats regime binding on BPC (2.4069 vs 2.4177). Regime
+specialization is still not earning its metadata cost.

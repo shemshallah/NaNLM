@@ -43,7 +43,10 @@ typedef struct {
     double ngram_top1;
     double hdc_bpc;
     double ngram_bpc;
-    int exemplar; /* 0 = majority prototypes, 1 = first-K contexts */
+    uint32_t calib_n;
+    uint32_t eval_n;
+    double temperature;
+    int memory_mode; /* 0 = hash buckets, 1 = reservoir exemplars, 2 = k-means */
 } nanlm_lm_model;
 
 nanlm_lm_model *nanlm_lm_model_new(uint32_t dim, uint32_t vocab,

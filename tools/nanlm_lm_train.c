@@ -10,7 +10,7 @@ static void usage(const char *argv0) {
             "          [--manifest FILE] [--dim BITS] [--queries N]\n"
             "          [--train-frac F] [--seed HEX] [--clusters N]\n"
             "          [--zero-positions] [--swap01] [--swap-predicted]\n"
-            "          [--exemplar]\n",
+            "          [--memory hash|exemplar|kmeans]\n",
             argv0);
 }
 
@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
     const char *out = "models/nanlm_lm.nas";
     const char *expected_path = "models/nanlm_lm.expected";
     const char *manifest_path = "models/nanlm_lm.manifest";
-    uint32_t dim = 1024;
+    uint32_t dim = 2048;
     uint32_t nqueries = 32;
     uint32_t clusters = NANLM_LM_CLUSTERS;
     double train_frac = 0.85;
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
     int zero_positions = 0;
     int swap01 = 0;
     int swap_predicted = 0;
-    int exemplar = 0;
+    int memory_mode = 0;
     unsigned char *data;
     size_t len = 0;
     nanlm_lm_model *m;
@@ -91,7 +91,14 @@ int main(int argc, char **argv) {
         else if (strcmp(a, "--zero-positions") == 0) { zero_positions = 1; }
         else if (strcmp(a, "--swap01") == 0) { swap01 = 1; }
         else if (strcmp(a, "--swap-predicted") == 0) { swap_predicted = 1; }
-        else if (strcmp(a, "--exemplar") == 0) { exemplar = 1; }
+        else if (strcmp(a, "--exemplar") == 0) { memory_mode = 1; }
+        else if (strcmp(a, "--memory") == 0 && v) {
+            if (strcmp(v, "hash") == 0) memory_mode = 0;
+            else if (strcmp(v, "exemplar") == 0) memory_mode = 1;
+            else if (strcmp(v, "kmeans") == 0) memory_mode = 2;
+            else return 2;
+            i++;
+        }
         else { usage(argv[0]); return 2; }
     }
 
@@ -112,7 +119,7 @@ int main(int argc, char **argv) {
         free(data);
         return 1;
     }
-    m->exemplar = exemplar;
+    m->memory_mode = memory_mode;
     if (nanlm_lm_train(m, data, len, train_frac, seed) != 0) {
         fprintf(stderr, "training failed\n");
         goto done;
@@ -152,10 +159,11 @@ int main(int argc, char **argv) {
            m->dim, m->vocab, m->clusters, m->nqueries, NANLM_LM_CTX);
     printf("train_bytes=%u val_bytes=%u train_frac=%.3f\n", m->train_bytes,
            m->val_bytes, train_frac);
+    printf("eval_n=%u calib_n=%u temperature=%.1f\n", m->eval_n, m->calib_n,
+           m->temperature);
     printf("hdc_top1=%.2f%% ngram_top1=%.2f%%\n", m->hdc_top1,
            m->ngram_top1);
-    printf("ngram_bpc=%.4f (HDC probability calibration not implemented)\n",
-           m->ngram_bpc);
+    printf("hdc_bpc=%.4f ngram_bpc=%.4f\n", m->hdc_bpc, m->ngram_bpc);
     printf("wrote %s, %s, %s\n", out, expected_path, manifest_path);
     rc = 0;
 

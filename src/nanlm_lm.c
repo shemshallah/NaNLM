@@ -190,10 +190,232 @@ uint32_t nanlm_lm_hash(const nanlm_vec *v) {
     return h;
 }
 
+static uint32_t flat_dist(const nanlm_vec *a, const nanlm_vec *b) {
+    uint32_t d = 0;
+    size_t w;
+    for (w = 0; w < a->words; w++) {
+        d += nan16_popcount32(nan16_payload(a->w[w]) ^
+                              nan16_payload(b->w[w]));
+    }
+    return d;
+}
+
+static double bpc_from_dist(const uint32_t *dist, uint32_t nproto,
+                            uint32_t clusters, uint32_t expected, double T) {
+    uint32_t nclass = nproto / clusters;
+    double *logsum;
+    double maxs = -1e300, sum = 0.0, logp;
+    uint32_t c, k;
+    if (nclass == 0 || expected >= nclass || clusters == 0) return 8.0;
+    logsum = (double *)calloc(nclass, sizeof(*logsum));
+    if (!logsum) return 8.0;
+    for (c = 0; c < nclass; c++) {
+        double mx = -1e300, ssum = 0.0;
+        for (k = 0; k < clusters; k++) {
+            double s = -(double)dist[c * clusters + k] / T;
+            if (s > mx) mx = s;
+        }
+        for (k = 0; k < clusters; k++) {
+            ssum += exp(-(double)dist[c * clusters + k] / T - mx);
+        }
+        logsum[c] = mx + log(ssum);
+        if (logsum[c] > maxs) maxs = logsum[c];
+    }
+    for (c = 0; c < nclass; c++) sum += exp(logsum[c] - maxs);
+    logp = (logsum[expected] - maxs - log(sum)) / log(2.0);
+    free(logsum);
+    return -logp;
+}
+
+static size_t sample_pos(size_t start, size_t end, size_t i, size_t n) {
+    size_t pos;
+    if (end == 0 || start > end || n == 0) return start;
+    pos = start + (i * (end - start + 1)) / n;
+    if (pos > end) pos = end;
+    return pos;
+}
+
+static void ngram_one(const Pair *pairs, size_t npairs, uint32_t key,
+                      uint8_t expected, uint32_t vocab, uint32_t *correct,
+                      double *bpc) {
+    size_t lo = lower_key(pairs, npairs, key);
+    size_t hi = upper_key(pairs, npairs, key);
+    uint32_t counts[256] = {0};
+    uint32_t total = (uint32_t)(hi - lo);
+    uint32_t best_c = 0, best_count = 0;
+    uint32_t c;
+    double alpha = 0.1, p;
+    for (size_t j = lo; j < hi; j++) counts[pairs[j].next]++;
+    for (c = 0; c < vocab; c++) {
+        if (counts[c] > best_count) {
+            best_count = counts[c];
+            best_c = c;
+        }
+    }
+    if (total > 0 && best_c == expected) (*correct)++;
+    p = ((double)counts[expected] + alpha) /
+        ((double)total + alpha * (double)vocab);
+    *bpc += -log(p) / log(2.0);
+}
+
+static int nanlm_lm_build_kmeans(nanlm_lm_model *m, const uint8_t *data,
+                                 size_t train_len) {
+    size_t ntrain = (train_len >= 3) ? train_len - 3 : 0;
+    size_t idx = 0, t;
+    nan16_word *ctx = NULL;
+    uint8_t *labels = NULL;
+    uint32_t *cnt = NULL, *offs = NULL, *idxlist = NULL, *fill = NULL;
+    nanlm_vec *q = NULL;
+    uint32_t c, i, k, w, b, it;
+
+    if (ntrain == 0) return -1;
+    ctx = (nan16_word *)calloc(ntrain * m->words, sizeof(*ctx));
+    labels = (uint8_t *)calloc(ntrain, 1);
+    q = nanlm_vec_new(m->words);
+    if (!ctx || !labels || !q) {
+        free(ctx);
+        free(labels);
+        nanlm_vec_free(q);
+        return -1;
+    }
+    for (t = 2; t + 1 < train_len; t++) {
+        uint8_t ids[3];
+        uint32_t cls = data[t + 1];
+        ids[0] = data[t - 2];
+        ids[1] = data[t - 1];
+        ids[2] = data[t];
+        if (cls >= m->vocab) continue;
+        if (nanlm_lm_encode(m, ids, q) != 0) {
+            free(ctx);
+            free(labels);
+            nanlm_vec_free(q);
+            return -1;
+        }
+        memcpy(ctx + idx * m->words, q->w, m->words * sizeof(*q->w));
+        labels[idx] = (uint8_t)cls;
+        idx++;
+    }
+    ntrain = idx;
+    if (ntrain < m->clusters) {
+        free(ctx);
+        free(labels);
+        nanlm_vec_free(q);
+        return -1;
+    }
+
+    cnt = (uint32_t *)calloc(m->vocab, sizeof(*cnt));
+    offs = (uint32_t *)calloc(m->vocab + 1, sizeof(*offs));
+    idxlist = (uint32_t *)calloc(ntrain, sizeof(*idxlist));
+    fill = (uint32_t *)calloc(m->vocab, sizeof(*fill));
+    if (!cnt || !offs || !idxlist || !fill) {
+        free(ctx);
+        free(labels);
+        nanlm_vec_free(q);
+        free(cnt);
+        free(offs);
+        free(idxlist);
+        free(fill);
+        return -1;
+    }
+    for (i = 0; i < ntrain; i++) cnt[labels[i]]++;
+    for (c = 0; c < m->vocab; c++) offs[c + 1] = offs[c] + cnt[c];
+    memcpy(fill, offs, m->vocab * sizeof(*fill));
+    for (i = 0; i < ntrain; i++) idxlist[fill[labels[i]]++] = i;
+
+    for (c = 0; c < m->vocab; c++) {
+        uint32_t n = offs[c + 1] - offs[c];
+        uint32_t K = m->clusters;
+        uint32_t *cent = NULL, *ones = NULL, *tot = NULL;
+        if (n == 0) continue;
+        cent = (uint32_t *)calloc((size_t)K * m->words, sizeof(*cent));
+        ones = (uint32_t *)calloc((size_t)K * m->dim, sizeof(*ones));
+        tot = (uint32_t *)calloc(K, sizeof(*tot));
+        if (!cent || !ones || !tot) {
+            free(cent);
+            free(ones);
+            free(tot);
+            free(ctx);
+            free(labels);
+            nanlm_vec_free(q);
+            free(cnt);
+            free(offs);
+            free(idxlist);
+            free(fill);
+            return -1;
+        }
+        for (k = 0; k < K; k++) {
+            uint32_t src = offs[c] + (uint32_t)(((uint64_t)k * n) / K);
+            if (src >= offs[c + 1]) src = offs[c];
+            for (w = 0; w < m->words; w++) {
+                cent[(size_t)k * m->words + w] =
+                    nan16_payload(ctx[(size_t)src * m->words + w]);
+            }
+        }
+        for (it = 0; it < 4; it++) {
+            memset(ones, 0, (size_t)K * m->dim * sizeof(*ones));
+            memset(tot, 0, K * sizeof(*tot));
+            for (i = offs[c]; i < offs[c + 1]; i++) {
+                uint32_t bestk = 0;
+                uint32_t bestd = UINT32_MAX;
+                uint32_t row = idxlist[i];
+                for (k = 0; k < K; k++) {
+                    uint32_t d = 0;
+                    for (w = 0; w < m->words; w++) {
+                        uint32_t x = nan16_payload(ctx[(size_t)row * m->words + w]) ^
+                                     cent[(size_t)k * m->words + w];
+                        d += nan16_popcount32(x);
+                    }
+                    if (d < bestd) { bestd = d; bestk = k; }
+                }
+                tot[bestk]++;
+                for (w = 0; w < m->words; w++) {
+                    uint32_t x = nan16_payload(ctx[(size_t)row * m->words + w]);
+                    for (b = 0; b < 32u; b++) {
+                        if ((x >> b) & 1u) {
+                            ones[(size_t)bestk * m->dim + w * 32u + b]++;
+                        }
+                    }
+                }
+            }
+            for (k = 0; k < K; k++) {
+                if (tot[k] == 0) continue;
+                for (w = 0; w < m->words; w++) {
+                    uint32_t p = 0;
+                    for (b = 0; b < 32u; b++) {
+                        size_t z = (size_t)k * m->dim + w * 32u + b;
+                        if ((uint64_t)ones[z] * 2u > (uint64_t)tot[k]) {
+                            p |= (1u << b);
+                        }
+                    }
+                    cent[(size_t)k * m->words + w] = p;
+                }
+            }
+        }
+        for (k = 0; k < K; k++) {
+            for (w = 0; w < m->words; w++) {
+                m->prototypes[(size_t)c * K + k]->w[w] =
+                    nan16_make(cent[(size_t)k * m->words + w], NAN16_N_DATA);
+            }
+        }
+        free(cent);
+        free(ones);
+        free(tot);
+    }
+
+    free(ctx);
+    free(labels);
+    nanlm_vec_free(q);
+    free(cnt);
+    free(offs);
+    free(idxlist);
+    free(fill);
+    return 0;
+}
+
 int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
                    double train_frac, uint64_t seed) {
     uint64_t state = seed;
-    size_t train_len, qstart, qend, npos, t, qi;
+    size_t train_len, npos, t, qi;
     uint32_t c, w, b, i;
     uint32_t *ones = NULL;
     uint32_t *total = NULL;
@@ -202,6 +424,9 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
     nanlm_vec *q = NULL;
     Pair *pairs = NULL;
     size_t npairs = 0;
+    uint32_t *calib_dist = NULL;
+    uint8_t *calib_exp = NULL;
+    uint32_t *dist = NULL;
     double T = 32.0;
     double hdc_bpc = 0.0, ngram_bpc = 0.0;
     uint32_t hdc_correct = 0, ngram_correct = 0;
@@ -219,7 +444,10 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
         nanlm_vec_random(m->positions[i], &state);
     }
 
-    if (m->exemplar) {
+    if (m->memory_mode == 2) {
+        if (nanlm_lm_build_kmeans(m, data, train_len) != 0) return -1;
+    } else {
+    if (m->memory_mode == 1) {
         seen = (uint32_t *)calloc(m->vocab, sizeof(*seen));
         if (!seen) return -1;
     } else {
@@ -229,7 +457,8 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
                                    sizeof(*total));
     }
     q = nanlm_vec_new(m->words);
-    if ((!m->exemplar && (!ones || !total)) || (m->exemplar && !seen) || !q) {
+    if ((m->memory_mode != 1 && (!ones || !total)) ||
+        (m->memory_mode == 1 && !seen) || !q) {
         free(ones);
         free(total);
         free(seen);
@@ -251,7 +480,7 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
             nanlm_vec_free(q);
             return -1;
         }
-        if (m->exemplar) {
+        if (m->memory_mode == 1) {
             uint32_t slot;
             if (seen[cls] < m->clusters) {
                 slot = seen[cls];
@@ -279,7 +508,7 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
         }
     }
 
-    if (!m->exemplar) {
+    if (m->memory_mode != 1) {
         for (c = 0; c < m->vocab * m->clusters; c++) {
             for (w = 0; w < m->words; w++) {
                 uint32_t p = 0;
@@ -294,76 +523,14 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
         }
     }
 
-    /* Held-out queries, evenly spaced over the validation split. */
-    qstart = train_len + 2;
-    qend = len - 1; /* exclusive: a query at pos needs pos+1 < len */
-    if (qend <= qstart) {
-        free(ones);
-        free(total);
-        free(seen);
-        nanlm_vec_free(q);
-        return -1;
     }
-    for (qi = 0; qi < m->nqueries; qi++) {
-        size_t pos = qstart + (qi * (qend - qstart)) / m->nqueries;
-        uint8_t ids[3];
-        if (pos + 1 >= len) pos = len - 2;
-        ids[0] = data[pos - 2];
-        ids[1] = data[pos - 1];
-        ids[2] = data[pos];
-        memcpy(m->query_ids + qi * NANLM_LM_CTX, ids, NANLM_LM_CTX);
-        m->expected[qi] = data[pos + 1];
-        if (nanlm_lm_encode(m, ids, m->queries[qi]) != 0) {
-            free(ones);
-            free(total);
-            free(seen);
-            nanlm_vec_free(q);
-            return -1;
-        }
-        m->hashes[qi] = nanlm_lm_hash(m->queries[qi]);
-    }
-
-    /* HDC top-1 and a diagnostic softmax bits/byte. The emitted expected
-     * class is the C model's prediction, not the corpus ground truth. */
-    for (qi = 0; qi < m->nqueries; qi++) {
-        double scores[256 * NANLM_LM_MAX_CLUSTERS];
-        double maxs = -1e300, sum = 0.0;
-        uint32_t got = 0;
-        if (nanlm_lm_predict(m, m->queries[qi], &got) != 0) {
-            free(ones);
-            free(total);
-            free(seen);
-            nanlm_vec_free(q);
-            return -1;
-        }
-        m->predicted[qi] = (uint8_t)got;
-        if (got == m->expected[qi]) hdc_correct++;
-        for (c = 0; c < m->vocab * m->clusters; c++) {
-            uint64_t d = nanlm_vec_hamming(m->queries[qi], m->prototypes[c]);
-            scores[c] = -(double)d / T;
-            if (scores[c] > maxs) maxs = scores[c];
-        }
-        for (c = 0; c < m->vocab * m->clusters; c++) {
-            sum += exp(scores[c] - maxs);
-        }
-        {
-            double logp = (scores[m->expected[qi]] - maxs - log(sum)) / log(2.0);
-            hdc_bpc += -logp;
-        }
-    }
-
-    /* Order-3 byte n-gram baseline on the same held-out queries. */
+    /* Order-3 byte n-gram baseline, built once from the training split. */
     npos = (train_len >= 3) ? train_len - 3 : 0;
-    if (npos > 0) {
+    if (npos == 0) goto fail;
+    pairs = (Pair *)calloc(npos, sizeof(*pairs));
+    if (!pairs) goto fail;
+    {
         size_t k = 0;
-        pairs = (Pair *)calloc(npos, sizeof(*pairs));
-        if (!pairs) {
-            free(ones);
-            free(total);
-            free(seen);
-            nanlm_vec_free(q);
-            return -1;
-        }
         for (t = 2; t + 1 < train_len; t++) {
             pairs[k].key = ((uint32_t)data[t - 2] << 16) |
                             ((uint32_t)data[t - 1] << 8) | data[t];
@@ -372,43 +539,142 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
         }
         npairs = k;
         qsort(pairs, npairs, sizeof(*pairs), pair_cmp);
-        for (qi = 0; qi < m->nqueries; qi++) {
-            uint32_t key = ((uint32_t)m->query_ids[qi * NANLM_LM_CTX] << 16) |
-                           ((uint32_t)m->query_ids[qi * NANLM_LM_CTX + 1] << 8) |
-                           m->query_ids[qi * NANLM_LM_CTX + 2];
-            size_t lo = lower_key(pairs, npairs, key);
-            size_t hi = upper_key(pairs, npairs, key);
-            uint32_t best_c = 0, best_count = 0;
-            uint32_t counts[256] = {0};
-            double alpha = 0.1;
-            uint32_t total_count = (uint32_t)(hi - lo);
-            for (size_t j = lo; j < hi; j++) counts[pairs[j].next]++;
-            for (c = 0; c < m->vocab; c++) {
-                if (counts[c] > best_count) {
-                    best_count = counts[c];
-                    best_c = c;
+    }
+
+    /* Calibration/test split inside the held-out validation region.
+     * Calibration chooses the HDC temperature; test reports the metric. */
+    {
+        uint32_t nproto = m->vocab * m->clusters;
+        size_t val_start = train_len + 2;
+        size_t val_end = len - 2;
+        size_t val_mid = train_len + (len - train_len) / 2;
+        size_t calib_start = val_start;
+        size_t calib_end = val_mid;
+        size_t test_start = val_mid + 2;
+        size_t calib_n, test_n, i;
+        double grid[] = {4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0,
+                         1024.0};
+        size_t gi;
+
+        if (val_end <= val_start || calib_end <= calib_start) goto fail;
+        if (test_start > val_end) test_start = val_start;
+        calib_n = calib_end - calib_start + 1;
+        test_n = val_end - test_start + 1;
+        if (calib_n > 128) calib_n = 128;
+        if (test_n > 128) test_n = 128;
+        if (calib_n == 0 || test_n == 0) goto fail;
+
+        calib_dist = (uint32_t *)calloc((size_t)calib_n * nproto,
+                                        sizeof(*calib_dist));
+        calib_exp = (uint8_t *)calloc(calib_n, 1);
+        dist = (uint32_t *)calloc(nproto, sizeof(*dist));
+        if (!calib_dist || !calib_exp || !dist) goto fail;
+
+        for (i = 0; i < calib_n; i++) {
+            size_t pos = sample_pos(calib_start, calib_end, i, calib_n);
+            uint8_t ids[3];
+            ids[0] = data[pos - 2];
+            ids[1] = data[pos - 1];
+            ids[2] = data[pos];
+            if (nanlm_lm_encode(m, ids, m->queries[0]) != 0) goto fail;
+            calib_exp[i] = data[pos + 1];
+            for (c = 0; c < nproto; c++) {
+                dist[c] = flat_dist(m->queries[0], m->prototypes[c]);
+            }
+            memcpy(calib_dist + i * nproto, dist, nproto * sizeof(*dist));
+        }
+
+        {
+            double best = 1e300;
+            for (gi = 0; gi < sizeof(grid) / sizeof(grid[0]); gi++) {
+                double sum = 0.0;
+                for (i = 0; i < calib_n; i++) {
+                    sum += bpc_from_dist(calib_dist + i * nproto, nproto,
+                                         m->clusters, calib_exp[i], grid[gi]);
+                }
+                if (sum < best) {
+                    best = sum;
+                    T = grid[gi];
                 }
             }
-            if (best_c == m->expected[qi]) ngram_correct++;
-            {
-                double p = ((double)counts[m->expected[qi]] + alpha) /
-                           ((double)total_count + alpha * (double)m->vocab);
-                ngram_bpc += -log(p) / log(2.0);
+        }
+        m->temperature = T;
+
+        for (i = 0; i < test_n; i++) {
+            size_t pos = sample_pos(test_start, val_end, i, test_n);
+            uint8_t ids[3];
+            uint32_t bestp = 0, bestd = UINT32_MAX;
+            ids[0] = data[pos - 2];
+            ids[1] = data[pos - 1];
+            ids[2] = data[pos];
+            if (nanlm_lm_encode(m, ids, m->queries[0]) != 0) goto fail;
+            for (c = 0; c < nproto; c++) {
+                dist[c] = flat_dist(m->queries[0], m->prototypes[c]);
+                if (dist[c] < bestd) { bestd = dist[c]; bestp = c; }
             }
+            if ((bestp >> m->proto_shift) == data[pos + 1]) hdc_correct++;
+            hdc_bpc += bpc_from_dist(dist, nproto, m->clusters,
+                                     data[pos + 1], T);
+            {
+                uint32_t key = ((uint32_t)ids[0] << 16) |
+                               ((uint32_t)ids[1] << 8) | ids[2];
+                ngram_one(pairs, npairs, key, data[pos + 1], m->vocab,
+                          &ngram_correct, &ngram_bpc);
+            }
+        }
+        m->calib_n = (uint32_t)calib_n;
+        m->eval_n = (uint32_t)test_n;
+        m->hdc_top1 = 100.0 * (double)hdc_correct / (double)test_n;
+        m->ngram_top1 = 100.0 * (double)ngram_correct / (double)test_n;
+        m->hdc_bpc = hdc_bpc / (double)test_n;
+        m->ngram_bpc = ngram_bpc / (double)test_n;
+    }
+
+    /* Runtime queries: a subset of the test region, emitted for the .nan
+     * differential gate. The expected class is the C prediction. */
+    {
+        size_t val_start = train_len + 2;
+        size_t val_end = len - 2;
+        size_t val_mid = train_len + (len - train_len) / 2;
+        size_t test_start = val_mid + 2;
+        if (test_start > val_end) test_start = val_start;
+        if (test_start > val_end) goto fail;
+        for (qi = 0; qi < m->nqueries; qi++) {
+            size_t pos = sample_pos(test_start, val_end, qi, m->nqueries);
+            uint8_t ids[3];
+            uint32_t got = 0;
+            ids[0] = data[pos - 2];
+            ids[1] = data[pos - 1];
+            ids[2] = data[pos];
+            memcpy(m->query_ids + qi * NANLM_LM_CTX, ids, NANLM_LM_CTX);
+            m->expected[qi] = data[pos + 1];
+            if (nanlm_lm_encode(m, ids, m->queries[qi]) != 0) goto fail;
+            if (nanlm_lm_predict(m, m->queries[qi], &got) != 0) goto fail;
+            m->predicted[qi] = (uint8_t)got;
+            m->hashes[qi] = nanlm_lm_hash(m->queries[qi]);
         }
     }
 
-    m->hdc_top1 = 100.0 * (double)hdc_correct / (double)m->nqueries;
-    m->ngram_top1 = 100.0 * (double)ngram_correct / (double)m->nqueries;
-    m->hdc_bpc = hdc_bpc / (double)m->nqueries;
-    m->ngram_bpc = ngram_bpc / (double)m->nqueries;
-
+    free(calib_dist);
+    free(calib_exp);
+    free(dist);
     free(pairs);
     free(ones);
     free(total);
     free(seen);
     nanlm_vec_free(q);
     return 0;
+
+fail:
+    free(calib_dist);
+    free(calib_exp);
+    free(dist);
+    free(pairs);
+    free(ones);
+    free(total);
+    free(seen);
+    nanlm_vec_free(q);
+    return -1;
 }
 
 void nanlm_lm_zero_positions(nanlm_lm_model *m) {
@@ -535,8 +801,12 @@ int nanlm_lm_write_manifest(const nanlm_lm_model *m, const char *path,
     fprintf(f, "val_bytes %u\n", m->val_bytes);
     fprintf(f, "train_frac %.6f\n", train_frac);
     fprintf(f, "seed 0x%016llX\n", (unsigned long long)seed);
+    fprintf(f, "calib_n %u\n", m->calib_n);
+    fprintf(f, "eval_n %u\n", m->eval_n);
+    fprintf(f, "temperature %.6f\n", m->temperature);
     fprintf(f, "hdc_top1 %.6f\n", m->hdc_top1);
     fprintf(f, "ngram_top1 %.6f\n", m->ngram_top1);
+    fprintf(f, "hdc_bpc %.6f\n", m->hdc_bpc);
     fprintf(f, "ngram_bpc %.6f\n", m->ngram_bpc);
     fprintf(f, "data_org 8192\n");
     fprintf(f, "codebook_words %u\n", m->vocab * m->words);

@@ -36,8 +36,9 @@ runtime binds three codebook vectors with position vectors, bundles them by
 majority, hashes the encoded query, and classifies it. The 2,048-bit
 byte-level model runs 32 held-out contexts on `nanlm_vm` in ~140M steps and
 matches the C adapter on every predicted byte and query hash. The honest
-quality number is **34.4% top-1 vs 50% for an order-3 n-gram**; this is a
-structural base, not a competitive LM.
+result on 128 held-out contexts is **26.6% top-1 / 5.50 bits-per-byte vs 50.0%
+/ 3.85 for an order-3 n-gram**; this is a structural base, not a competitive
+LM.
 
 ## What this is
 
@@ -77,7 +78,7 @@ table below describes the current M2b base.
 | inference | NaN16 `BOOL`, `ADD`, `SHL`, `SHR`, `LD`, `ST`, `JMP` |
 | arithmetic | integer only; no FP in the model |
 | model size | ~1.2 MB of NaN words including codebook |
-| quality | 34.4% top-1 / order-3 n-gram 50% on the Alice excerpt |
+| quality | 26.6% top-1, 5.50 BPC / n-gram 50%, 3.85 BPC (128 contexts) |
 
 The point is not the score. The point is that every weight is a gated NaN
 word, every operation is a Boolean function, and the whole model can be

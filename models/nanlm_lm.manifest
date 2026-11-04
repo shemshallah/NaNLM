@@ -11,9 +11,13 @@ train_bytes 25500
 val_bytes 4500
 train_frac 0.850000
 seed 0x4E414E4C4D4C4D01
-hdc_top1 34.375000
+calib_n 128
+eval_n 128
+temperature 128.000000
+hdc_top1 26.562500
 ngram_top1 50.000000
-ngram_bpc 3.778567
+hdc_bpc 5.498169
+ngram_bpc 3.850550
 data_org 8192
 codebook_words 16384
 position_words 192

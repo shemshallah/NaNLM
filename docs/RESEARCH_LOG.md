@@ -2,7 +2,30 @@
 
 Short, dated entries. Negative results stay in.
 
-## 2026-11-03 — M2b byte-level base
+## 2026-11-03 — M2b calibrated evaluation
+
+128 held-out contexts, temperature calibrated on a disjoint 128-context slice.
+D=2,048, hash-bucket memory.
+
+| clusters/byte | top-1 | BPC |
+|---:|---:|---:|
+| 1 | 20.3% | 5.74 |
+| 2 | 24.2% | 5.57 |
+| 4 | 22.7% | 5.51 |
+| 8 | **26.6%** | 5.50 |
+| 16 | 25.0% | **5.38** |
+| order-3 n-gram | 50.0% | 3.85 |
+
+The class-level log-sum-exp over prototypes fixed the earlier uncalibrated
+BPC. The model still loses to the n-gram, but the number is now meaningful.
+Eight clusters is the best top-1; sixteen is the best BPC. The default stays at
+eight because the runtime is half the size.
+
+## 2026-11-03 — 32-query exploration (superseded)
+
+These numbers use only 32 contexts and a single softmax over prototypes; treat
+them as exploratory, not headline results. The 128-context table above
+supersedes them.
 
 Corpus: first 30,000 bytes of Project Gutenberg #11 (*Alice*), 85/15 split by
 byte offset. D=2,048, vocab=256, context=3, 32 held-out contexts.
@@ -12,11 +35,11 @@ byte offset. D=2,048, vocab=256, context=3, 32 held-out contexts.
 | HDC 1 prototype/byte | 21.9% | 50.0% | 3.78 | not measured |
 | HDC 2 prototypes/byte | 25.0% | 50.0% | 3.78 | not measured |
 | HDC 4 prototypes/byte | 25.0% | 50.0% | 3.78 | 70.3M steps |
-| HDC 8 prototypes/byte | **34.4%** | 50.0% | 3.78 | 140.4M steps |
+| HDC 8 prototypes/byte | 34.4%* | 50.0% | 3.78 | 140.4M steps |
 | HDC 16 prototypes/byte | 28.1% | 50.0% | 3.78 | 280.8M steps |
 
-All numbers use only 32 held-out contexts. The standard error is large: one
-query is 3.1 percentage points. Do not treat the cluster ranking as settled.
+`*` 32-query subset. The 128-context table is the headline; one query is 3.1
+points, so the old ranking was noisy.
 
 The n-gram wins on quality. The HDC model is real, runs as a `.nan` image, and
 matches the C adapter on every predicted byte and hash, but it is not
@@ -24,12 +47,9 @@ competitive.
 
 ### What this says
 
-- Four prototypes per byte is not enough; eight is better.
-- Sixteen is worse at this D and corpus; more capacity is not monotonic.
-- The decoder is the bottleneck, not the encoder: the query hash matches
-  exactly, so the runtime is doing the binding/bundling correctly.
-- HDC probability calibration is not implemented. Do not report HDC bits/byte
-  until a temperature or readout is selected on held-out data.
+The 32-query table is too noisy to rank cluster counts. It was useful for
+finding the pipeline and the first negative results, not for a model card.
+The 128-context calibrated table is the headline.
 
 ### Dimension sweep at 8 prototypes/byte
 
@@ -44,43 +64,57 @@ competitive.
 
 Bigger D did not help. That points at the memory/decoder, not raw capacity.
 
+### K-means memory (negative)
+
+K-means per byte class (4 iterations) on the 128-context eval:
+
+| K | top-1 | BPC |
+|---:|---:|---:|
+| 4 | 21.1% | 5.60 |
+| 8 | 23.4% | 5.56 |
+| 16 | 21.1% | 5.66 |
+
+Below the hash-bucket memory (26.6% / 5.50). The centroids collapse toward
+common contexts. Keep k-means as an ablation, not the default.
+
 ### Exemplar memory (negative)
 
-First K training contexts per class, nearest exemplar:
+Reservoir exemplars on the 128-context eval:
 
-| K | first-K | reservoir |
+| K | top-1 | BPC |
 |---:|---:|---:|
-| 4 | 3.1% | 15.6% |
-| 8 | 9.4% | 25.0% |
-| 16 | 21.9% | 25.0% |
+| 4 | 14.1% | 6.56 |
+| 8 | 18.0% | 6.25 |
+| 16 | 21.9% | 5.90 |
 
-Reservoir sampling is much better than first-K, but still below the majority
-centroid (34.4%). Nearest-exemplar is not automatically better. A k-means
-assignment is the next version, not this one.
+First-K exemplars were worse (3–22% on 32 contexts). Nearest-exemplar is not
+automatically better than a class centroid; reservoir sampling helps but does
+not win.
 
-### Hypotheses
+### Hypotheses after the 128-context run
 
-1. **Capacity:** D=2,048 is too small for 256 byte classes with order-3
-   contexts. The next scale is D=8,192.
-2. **Memory shape:** class centroids discard context diversity. Exemplar
-   memory or k-means clusters should beat hash buckets.
-3. **Decoder:** nearest Hamming with 8 buckets is crude. A top-k vote or a
-   small learned readout could help without changing the keystone.
-4. **Tokenizer:** byte classes are hard. A 32–64 symbol tokenizer might make
-   the same substrate look much better, but it changes the task.
-5. **Binding:** XOR is not necessarily the best binding for this corpus.
-   `BSWAPM` and learned `BOOL.n` binding are worth a controlled ablation.
+1. **Capacity is not the bottleneck.** Bigger D did not help in the 32-query
+   sweep; retest D=4,096/8,192 at 128 contexts before scaling.
+2. **Memory shape mattered, but not as expected.** Hash buckets beat k-means
+   and reservoir exemplars. The next memory experiment should be a
+   context-aware hash or a learned partition, not vanilla k-means.
+3. **Decoder calibration mattered.** Class-level log-sum-exp fixed the
+   uncalibrated BPC. A top-k vote or a small readout is the next decoder
+   experiment.
+4. **Byte classes are hard.** A 32–64 symbol tokenizer is a different task but
+   may reveal whether the substrate is the problem or the class count.
+5. **Binding is still open.** XOR is a baseline; `BSWAPM` and learned
+   `BOOL.n` binding are controlled ablations.
 
 ### Next experiments, in order
 
-1. D=8,192, 8 clusters, same corpus, same queries. Measure top-1 and steps.
-2. Exemplar memory: 256–1,024 held-out training contexts, nearest exemplar.
-3. Calibrated decoding: temperature sweep on a disjoint validation slice;
-   report BPC only if it beats uniform.
-4. k-means buckets instead of hash buckets; same number of prototypes.
-5. `BSWAPM` position binding vs XOR position vectors.
-6. Context length 2/3/4.
-7. A 64-symbol tokenizer, clearly labeled as a different task.
+1. Retest D=4,096 and D=8,192 at 128 calibrated contexts; the earlier sweep
+   used 32.
+2. Context-aware hash or learned partition; vanilla k-means lost.
+3. Top-k prototype vote; nearest-1 is leaving information on the table.
+4. A 64-symbol tokenizer, clearly labeled as a different task.
+5. `BSWAPM` vs XOR position binding.
+6. Seal/loader, so the model image is tamper-evident.
 
 ### What not to do
 

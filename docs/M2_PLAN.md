@@ -19,10 +19,11 @@ prototypes, and step starvation all fail the differential gate.
 
 M2b results on the 30 KB Alice excerpt:
 
-- 34.4% top-1 vs 50% for an order-3 n-gram;
-- n-gram 3.78 bits/byte; HDC probability calibration is not implemented;
+- 26.6% top-1 / 5.50 BPC vs 50.0% / 3.85 for an order-3 n-gram
+  (128 calibrated held-out contexts);
+- HDC temperature calibrated on a disjoint 128-context slice;
 - the runtime matches the C adapter on every predicted byte and hash;
-- ~140M VM steps for 32 held-out contexts.
+- ~140M VM steps for 32 emitted queries; metrics use 128 held-out contexts.
 
 ## M2a — force the runtime to use binding and bundling
 

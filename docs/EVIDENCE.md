@@ -181,8 +181,9 @@ Output:
 ```
 nanlm-lm: dim=2048 vocab=256 clusters=8 queries=32 context=3
 train_bytes=25500 val_bytes=4500 train_frac=0.850
-hdc_top1=34.38% ngram_top1=50.00%
-ngram_bpc=3.7786 (HDC probability calibration not implemented)
+eval_n=128 calib_n=128 temperature=128.0
+hdc_top1=26.56% ngram_top1=50.00%
+hdc_bpc=5.4982 ngram_bpc=3.8505
 build_lm: PASS (32 queries)
 build_lm: NEGATIVE PASS (zero positions rejected)
 build_lm: NEGATIVE PASS (predicted prototypes rejected)
@@ -192,14 +193,14 @@ build_lm: NEGATIVE PASS (step starvation rejected)
 The NaNLM VM trace:
 
 ```
-[nanlm-vm] nan-text: 140442599 steps, rc=3, pc=40, trap=''
+[nanlm-vm] nan-text: 140442458 steps, rc=3, pc=40, trap=''
 ```
 
 This is a real byte-level model: 2,048-bit codebook, 256 byte classes, eight
 prototypes per class, three-byte context, held-out Alice excerpt. The runtime
-matches the C adapter on all 32 predicted bytes and hashes. The honest result
-is that the order-3 n-gram wins (50% vs 34.4% top-1), and HDC probability
-calibration is not implemented.
+matches the C adapter on all 32 emitted predictions and hashes. The honest
+result on 128 calibrated held-out contexts is that the order-3 n-gram wins:
+26.6% top-1 / 5.50 bits-per-byte vs 50.0% / 3.85.
 
 The model is a structural base, not a quality claim.
 
@@ -214,8 +215,9 @@ The model is a structural base, not a quality claim.
 ## What is not proven yet
 
 - M2b is a byte-level structural base, not a competitive language model; the
-  n-gram baseline wins 50% to 34.4% top-1.
-- HDC bits/byte is not calibrated; only the n-gram BPC is reported.
+  n-gram baseline wins 50.0% to 26.6% top-1 and 3.85 to 5.50 BPC.
+- HDC BPC is calibrated on a disjoint 128-context slice; it is still worse than
+  the n-gram (5.50 vs 3.85).
 - The 8,192-bit byte model has not been trained or run.
 - The seal/loader path does not exist yet.
 - CI runs the full gates on x86-64 and the local gates run on aarch64.

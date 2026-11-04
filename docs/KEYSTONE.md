@@ -193,15 +193,16 @@ Next supports:
 
 ## Next three supports
 
-1. **Calibrated HDC decoding.** The current top-1 is 34.4%; no bits/byte is
-   reported because the Hamming softmax is not calibrated. A temperature
-   selected on a validation slice, or a held-out logistic readout, would make
-   the language-model metric honest.
-2. **Exemplar memory.** Store a subset of training contexts instead of class
-   centroids. This should improve top-1, at the cost of more prototypes and a
-   larger runtime search.
+1. **Top-k decoding.** Nearest-1 leaves information on the table. A k-nearest
+   class vote is the next decoder experiment; it can keep the same prototypes.
+2. **Context-aware memory.** Hash buckets beat k-means and reservoir exemplars.
+   A context-aware hash or a learned partition is the next memory experiment.
 3. **Seal/loader.** FNV A/B/C over the model words, a `.nan` loader that
    rejects corruption, and a model card that names the failure modes.
+
+Calibrated HDC decoding is implemented: class-level log-sum-exp with a
+temperature selected on a disjoint 128-context slice. The model still loses to
+the n-gram, and the card says so.
 
 Only after those should the project try a router, learned `BOOL.n` circuits, or
 a larger D.

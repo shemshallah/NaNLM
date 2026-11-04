@@ -46,27 +46,29 @@ Do not use it for:
 
 ## Metrics
 
-Measured on 32 held-out contexts:
+Measured on 128 held-out contexts. The HDC temperature was calibrated on a
+disjoint 128-context slice.
 
 | metric | value |
 |---|---:|
-| HDC top-1 | 34.4% |
+| HDC top-1 | 26.6% |
+| HDC bits/byte | 5.50 |
 | order-3 n-gram top-1 | 50.0% |
-| order-3 n-gram bits/byte | 3.78 |
-| HDC bits/byte | not reported (uncalibrated) |
-| VM steps for 32 queries | 140,442,599 |
+| order-3 n-gram bits/byte | 3.85 |
+| VM steps for 32 emitted queries | 140,442,458 |
 | VM trap | none |
 | model image | ~4.4 MB `.nan` text, 148k words |
 
 The n-gram wins. The HDC model is a real `.nan` program and matches the C
-adapter on every predicted byte and query hash.
+adapter on every emitted byte and query hash.
 
 ## Evaluation caveats
 
-- Only 32 queries; one query is 3.1 percentage points.
+- 128 evaluation contexts; one context is 0.78 percentage points.
 - One corpus; no cross-corpus claim.
-- The 8-prototype count was selected on the same small validation set.
-- HDC probabilities are not calibrated; only the n-gram BPC is meaningful.
+- The 8-prototype count was explored on the same corpus, but the test slice is
+  disjoint from calibration.
+- HDC probabilities are calibrated, but the model still loses to the n-gram.
 - The model image is not sealed yet; the query hash is a differential gate,
   not a weight seal.
 
@@ -99,9 +101,9 @@ The model trains and runs on a phone-class CPU in seconds. No GPU is used.
 
 ## Open work
 
-- D=8,192 and k-means memory.
-- Calibrated decoding / bits-per-byte.
-- Seal A/B/C and a `.nan` loader that rejects corruption.
 - Top-k decoding.
+- Context-aware memory (hash buckets beat k-means/exemplars).
+- D=4,096/8,192 retest at 128 contexts.
+- Seal A/B/C and a `.nan` loader that rejects corruption.
 - A 64-symbol tokenizer as a separate task.
 - A browser demo.

@@ -51,11 +51,11 @@ language model.
 - [x] M2b base: 2,048-bit, 256-byte vocabulary, 8 prototypes per byte.
 - [x] M2b base: codebook, position vectors, prototypes, held-out Alice excerpt.
 - [x] M2b base: order-3 n-gram baseline.
-- [x] M2b base: held-out top-1 accuracy (34.4% HDC vs 50% n-gram).
+- [x] M2b base: held-out top-1 accuracy (26.6% HDC / 5.50 BPC vs 50.0% / 3.85 n-gram).
 - [x] M2b base: `tools/build_lm.sh` end-to-end gate.
 - [ ] M2b next: 8,192-bit scale.
 - [ ] M2b next: seal A/B/C and loader verification.
-- [ ] M2b next: HDC probability calibration / bits-per-byte.
+- [x] M2b: HDC probability calibration and bits/byte (5.50 vs n-gram 3.85).
 - [ ] M2b next: 60-second demo script.
 
 **Exit gate:** a published result, including the case where the n-gram wins.

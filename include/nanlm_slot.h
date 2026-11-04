@@ -24,6 +24,12 @@ extern "C" {
 #define NANLM_SLOT_BITS (NANLM_SLOT_N * 256u)
 
 typedef struct {
+    uint32_t key;   /* 3-byte context */
+    uint8_t next;
+    uint16_t weight;
+} nanlm_slot_count;
+
+typedef struct {
     uint32_t nkeys;
     uint32_t *keys;    /* nkeys * NANLM_SLOT_VW payload words */
     uint8_t *labels;   /* nkeys majority next byte */
@@ -43,6 +49,12 @@ typedef struct {
 
 nanlm_slot_model *nanlm_slot_build(const uint8_t *data, size_t len,
                                    double train_frac, uint32_t nqueries);
+nanlm_slot_model *nanlm_slot_build_counts(const nanlm_slot_count *counts,
+                                          size_t ncounts,
+                                          const uint8_t *eval_data,
+                                          size_t eval_len,
+                                          double train_frac,
+                                          uint32_t nqueries);
 void nanlm_slot_free(nanlm_slot_model *m);
 
 int nanlm_slot_encode(const nanlm_slot_model *m, const uint8_t ctx[3],

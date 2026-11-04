@@ -30,6 +30,8 @@ jobs:
         run: make shard-check
       - name: teacher shard gate
         run: make teacher-check
+      - name: teacher -> slot gate
+        run: make teacher-slot-check
       - name: simplex slot memory gate
         run: make model-slot-check
       - name: byte-level LM gate

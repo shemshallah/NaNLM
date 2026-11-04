@@ -58,14 +58,33 @@ Conclusion: the teacher needs **more context and more capacity**, not a better
 decoder. The next teacher should be Qwen2.5-0.5B/7B (Apache-2.0) or a byte-level
 transformer trained on a larger public corpus.
 
-## 4. What this rules out
+## 4. Teacher -> typed slot plumbing
+
+The full compile path now exists:
+
+```
+teacher records -> last-3-byte aggregation -> typed slot model -> .nas -> nanlm_vm
+```
+
+`make teacher-slot-check` passes, but the fixture n-gram teacher is weak:
+
+```
+teacher_records=97124 contexts=16376 keys=4094
+hdc_top1=33.59% hdc_bpc=3.5187
+ngram_top1=55.47% ngram_bpc=3.1324
+```
+
+The plumbing is exact; the quality is not. A real Qwen/byte-level teacher
+replaces the fixture without changing the path.
+
+## 5. What this rules out
 
 - More context alone (4–6 bytes) made the raw memory worse.
 - Top-k decoding improved BPC but not top-1.
 - A small learned embedding did not beat ctype.
 - A small 3-byte neural teacher did not beat the n-gram on top-1.
 
-## 5. What remains
+## 6. What remains
 
 1. **Qwen teacher distillation** — byte-marginalized top-k distributions,
    additive shards, typed slot memory.

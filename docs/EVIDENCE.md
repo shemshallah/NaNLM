@@ -248,7 +248,26 @@ Training is `(3-gram, next byte, count)`; merging is integer addition. Two
 corpus slices merged in either order produce byte-identical shards. This is
 the CRDT property that lets volunteers train without coordination.
 
-## 9. Additional checks
+## 9. Teacher -> typed slot pipeline
+
+```sh
+make teacher-slot-check
+```
+
+Output:
+
+```
+teacher-slot: teacher_records=97124 contexts=16376 keys=4094
+eval_n=128 hdc_top1=33.59% hdc_bpc=3.5187
+ngram_top1=55.47% ngram_bpc=3.1324
+teacher_slot: PASS (32 queries)
+```
+
+The pipeline is exact: teacher shard → 3-byte aggregation → typed slot model →
+`.nas` → `nanlm_vm` → diff. The quality is poor because the fixture n-gram
+teacher is weak; this is a plumbing gate, not a model result.
+
+## 10. Additional checks
 
 - ASan + UBSan builds of `test_word`, `test_vec`, `test_model`, and `test_ctx` pass.
 - The same pipeline was run with `--dim 512 --classes 8 --queries 16` and
@@ -261,8 +280,8 @@ the CRDT property that lets volunteers train without coordination.
 - The class memory (M2b) loses to the n-gram: 26.6% / 5.50 BPC vs 50.0% / 3.85.
 - The slot memory (M3) wins bits-per-byte (2.67 vs 3.13) but loses top-1
   (52.3% vs 55.5%) on the 128-context Alice split.
-- The slot model is built from a corpus, not yet compiled directly from merged
-  shards.
+- The teacher → typed slot pipeline exists and passes plumbing, but the fixture
+  teacher is not smart enough to beat the n-gram.
 - reporam/repovram page mapping and generation manifests are designed but not
   implemented.
 - Teacher distillation (storing a small teacher's distribution) is not

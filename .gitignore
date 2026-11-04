@@ -5,3 +5,5 @@ build/
 *.so
 .DS_Store
 *.plist
+__pycache__/
+*.pyc

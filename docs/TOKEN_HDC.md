@@ -115,3 +115,17 @@ table and prototype storage, not more dimensions.
 
 Fixed binding beats regime binding on BPC (2.4069 vs 2.4177). Regime
 specialization is still not earning its metadata cost.
+
+## Model-size accounting update
+
+`experiments/token_hdc_ntt.py` now:
+
+- compiles each teacher context to the top `--top-counts` next tokens (default 8);
+- estimates sparse prototype storage from active coordinates;
+- counts prototype keys, top-k counts, token-ID table, and the token n-gram
+  fallback bytes;
+- prints Hutter totals for dense, sparse, sparse+ngram, and sparse+ngram+teacher
+  shard.
+
+This is the gate the 2.40 BPC result must pass. A run that reports 2.40 BPC but
+hundreds of BPC of model overhead is not a Pareto win.

@@ -52,6 +52,8 @@ def main() -> int:
     p.add_argument("--mode", choices=("fixed", "regime"), default="regime")
     p.add_argument("--nearest-threshold", type=float, default=0.35,
                    help="max Hamming fraction to trust an HDC prototype")
+    p.add_argument("--top-counts", type=int, default=8,
+                   help="top next-token counts stored per prototype")
     p.add_argument("--teacher-weight", type=float, default=0.55)
     p.add_argument("--seed", type=int, default=1234)
     args = p.parse_args()
@@ -83,6 +85,10 @@ def main() -> int:
     for ctx, nxt, weight in recs:
         t = unpack(ctx, 3)
         teacher[(t[0], t[1], t[2])][nxt] += weight
+    # Compile each teacher context to top-k next-token counts.
+    for ctx, bucket in list(teacher.items()):
+        teacher[ctx] = dict(sorted(bucket.items(), key=lambda kv: kv[1],
+                                   reverse=True)[:args.top_counts])
     teacher2: dict[tuple[int, int], dict[int, int]] = defaultdict(
         lambda: defaultdict(int)
     )
@@ -128,7 +134,8 @@ def main() -> int:
     print(f"token_hdc_ntt: mode={args.mode} dim={args.dim} "
           f"contexts={len(keys)} dense_model_bits={dense_bits} "
           f"active_bits={active_bits} "
-          f"active={100.0 * active_bits / max(1, dense_bits):.2f}%")
+          f"active={100.0 * active_bits / max(1, dense_bits):.2f}% "
+          f"top_counts={args.top_counts}")
 
     # Token n-gram fallback.
     g1, g2, g3 = defaultdict(lambda: defaultdict(int)), \
@@ -244,17 +251,26 @@ def main() -> int:
     # top-8 next-token counts, and the teacher shard are all reported.
     dense_bytes = (dense_bits + 7) // 8
     coord_bits = active_bits * (math.ceil(math.log2(args.dim)) + 1)
-    count_bits = len(keys) * 8 * (18 + 16)
-    sparse_bytes = (coord_bits + count_bits + 7) // 8
+    key_bits = len(keys) * 54
+    count_bits = len(keys) * args.top_counts * (18 + 16)
+    unique_bits = len(unique_ids) * 18
+    sparse_bits = coord_bits + key_bits + count_bits + unique_bits + 32
+    sparse_bytes = (sparse_bits + 7) // 8
+    ngram_records = (sum(len(b) for b in g1.values()) +
+                     sum(len(b) for b in g2.values()) +
+                     sum(len(b) for b in g3.values()))
+    ngram_bits = ngram_records * (18 + 18 + 32)
+    ngram_bytes = (ngram_bits + 7) // 8
     teacher_bytes_all = len(recs) * 16
     show("teacher_backoff", correct_t, bits_t, teacher_n, teacher_bytes)
     show("token_ngram", correct_ng, bits_ng, eval_n, eval_bytes)
     show("hdc_teacher_plus_ngram", correct_h, bits_h, eval_n, eval_bytes)
-    print(f"model_size: dense={dense_bytes} B sparse_coords+top8={sparse_bytes} B "
-          f"teacher_shard={teacher_bytes_all} B")
+    print(f"model_size: dense={dense_bytes} B sparse={sparse_bytes} B "
+          f"ngram_fallback={ngram_bytes} B teacher_shard={teacher_bytes_all} B")
     print(f"hutter_total_bpc: dense={(bits_h + 8.0 * dense_bytes) / max(1, eval_bytes):.4f} "
           f"sparse={(bits_h + 8.0 * sparse_bytes) / max(1, eval_bytes):.4f} "
-          f"with_teacher_shard={(bits_h + 8.0 * (sparse_bytes + teacher_bytes_all)) / max(1, eval_bytes):.4f}")
+          f"sparse_plus_ngram={(bits_h + 8.0 * (sparse_bytes + ngram_bytes)) / max(1, eval_bytes):.4f} "
+          f"with_teacher_shard={(bits_h + 8.0 * (sparse_bytes + ngram_bytes + teacher_bytes_all)) / max(1, eval_bytes):.4f}")
     return 0
 
 

@@ -207,6 +207,7 @@ The tests verify the parts that must not drift:
 - [Kaggle runbook](docs/KAGGLE.md) — one script for a free T4/GPU session, with teacher, hybrid backoff, and student artifacts.
 - `kaggle_hybrid.py` — rebuild hybrid students from an existing 7B teacher shard without reloading the model.
 - `kaggle_grid.py` — CPU-only teacher-scale and 8-slot-size grid from existing shards.
+- `kaggle_token.py` — one-line Kaggle token teacher run and NTT packaging.
 - [Modal GPU runbook](docs/MODAL.md) — install, authenticate, run one Qwen 7B teacher job, fetch the shard, and compile the student.
 - [AMD Radeon / ROCm runbook](docs/AMD_GPU.md) — Qwen 7B teacher commands for the AMD cloud box.
 - [AMD teacher notebook](notebooks/qwen7b_teacher.ipynb) — open in JupyterLab and run the whole Qwen 7B teacher/student gate.

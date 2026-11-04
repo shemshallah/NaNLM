@@ -32,7 +32,31 @@ The record is the exact teacher distribution over token IDs at a token
 boundary. No BPE marginalization. Weights are additive; merge and scale tools
 are in `tools/token_shard.py`.
 
-## Run on Kaggle from the cached 7B model
+## One-line Kaggle run
+
+The script handles the pull, token teacher, card, stats, and tar:
+
+```python
+!python /kaggle/working/NaNLM/kaggle_token.py
+```
+
+This avoids multi-line Jupyter formatting. If the repo is not cloned yet:
+
+```python
+!git clone --depth 1 https://github.com/shemshallah/NaNLM.git /kaggle/working/NaNLM
+!python /kaggle/working/NaNLM/kaggle_token.py
+```
+
+Outputs:
+
+```text
+/kaggle/working/qwen7b_tokens.ntt
+/kaggle/working/qwen7b_tokens.card.json
+/kaggle/working/token_teacher.log
+/kaggle/working/qwen7b_tokens.tgz
+```
+
+## Manual run
 
 ```python
 !git -C /kaggle/working/NaNLM pull --ff-only

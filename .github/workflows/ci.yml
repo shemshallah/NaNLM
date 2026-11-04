@@ -16,6 +16,8 @@ jobs:
         run: make lane-check
       - name: layer interpretation gate
         run: make layers-check
+      - name: install experiment dependency
+        run: python3 -m pip install --quiet numpy
       - name: routed LUT model gate
         run: make lut-check
       - name: self-modifying regime gate

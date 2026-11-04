@@ -1,0 +1,79 @@
+# Feature and teacher probes
+
+Two honest probes: a learned feature layer and a small neural teacher.
+
+## 1. Typed ctype feature layer — positive
+
+The typed slot memory is implemented in C and NaN16:
+
+```
+3 byte slots + 3 ctype slots = 1,536 bits
+```
+
+On the Alice split:
+
+| model | top-1 | BPC |
+|---|---:|---:|
+| raw 3-slot memory | 51.56% | 2.7196 |
+| **typed 6-slot memory** | **52.34%** | **2.6703** |
+| in-repo n-gram | 55.47% | 3.1304 |
+
+Runtime: 197,829,777 steps for 32 queries, exact output, no trap.
+
+The ctype layer is real: it improves top-1 and BPC without changing the
+memory or the decoder.
+
+## 2. Learned embedding features — negative
+
+A 3-byte MLP teacher was trained for 5 epochs and its 16-dimensional byte
+embedding was quantized into 8-bit codes. Those codes replaced the ctype slots.
+
+Results:
+
+| feature slots | top-1 | BPC |
+|---|---:|---:|
+| hand ctype | **52.34%** | **2.6703** |
+| learned embedding bits [0..7] | 51.56% | 2.723 |
+| learned embedding bits [8..15] | 50.78% | 2.752 |
+| learned embedding, interleaved | 50.78% | 2.755 |
+
+The learned embedding did not beat the hand-written ctype feature on this
+corpus. This is a useful negative: **learned features are not automatically
+better than a small, well-chosen typed feature layer.**
+
+## 3. Small neural teacher — insufficient for top-1
+
+A 3-byte embedding MLP (48 → 128 → 256, 5 epochs) on the full Alice text:
+
+| model | top-1 | BPC |
+|---|---:|---:|
+| MLP teacher | 49.86% | **2.579** |
+| in-repo n-gram | **55.47%** | 3.130 |
+| typed slot memory | 52.34% | 2.670 |
+
+The small teacher beats the n-gram on bits-per-byte but not on top-1. A student
+distilled from it cannot win top-1 on this split.
+
+Conclusion: the teacher needs **more context and more capacity**, not a better
+decoder. The next teacher should be Qwen2.5-0.5B/7B (Apache-2.0) or a byte-level
+transformer trained on a larger public corpus.
+
+## 4. What this rules out
+
+- More context alone (4–6 bytes) made the raw memory worse.
+- Top-k decoding improved BPC but not top-1.
+- A small learned embedding did not beat ctype.
+- A small 3-byte neural teacher did not beat the n-gram on top-1.
+
+## 5. What remains
+
+1. **Qwen teacher distillation** — byte-marginalized top-k distributions,
+   additive shards, typed slot memory.
+2. **8-slot student / longer teacher context** — a teacher conditioned on more
+   than 3 bytes, evaluated at 8-byte student context.
+3. **True learned LUT features** — not an embedding quantized to bits; a LUT
+   network trained end-to-end with STE.
+4. **8×8 digit task** — parameter-matched sparse vs dense on real data.
+5. **Mirror ensemble and capability loader.**
+
+The feature layer is real. The teacher is the missing quality ceiling.

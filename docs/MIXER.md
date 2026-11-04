@@ -40,6 +40,7 @@ Alice, 4,492 held-out bytes, table bits 14:
 | model | top-1 | BPC |
 |---|---:|---:|
 | static mixer | 45.97% | 3.7249 |
+| static mixer + online document cache | 46.68% | 3.7003 |
 | 3-gram baseline | 48.13% | 3.4203 |
 | 3-slot typed memory | **49.05%** | **2.9593** |
 
@@ -57,8 +58,9 @@ The static mixer loses. Its model is 6.24 MB, so it is not Pareto either.
    is small for code; collisions matter.
 5. **No match-model confidence calibration.** A raw match prediction is too
    strong or too weak depending on match length.
-6. **No per-document cache in the frozen run.** The document-local table exists
-   but is not used online in the default evaluation.
+6. **The document-local cache helps only slightly.** Adapting the document
+   table online improves 3.7249 → 3.7003 BPC, still behind the n-gram. The
+   global model remains frozen.
 7. **The stream is tiny.** Model-size accounting dominates; this is a
    plumbing result, not a compression result.
 

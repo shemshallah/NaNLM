@@ -505,7 +505,9 @@ int nanlm_mixer_train_eval(const uint8_t *data, size_t len, double train_frac,
     if (train_len < 16) return -1;
     m = nanlm_mixer_new(table_bits, use_doc_cache ? 14 : 8);
     if (!m) return -1;
-    m->adapt_mixer = online_adapt ? 1 : 0;
+    /* Keep the mixer weights fixed. `online_adapt` only adapts the
+     * document-local count table; the global tables stay frozen. */
+    m->adapt_mixer = 0;
     if (!use_doc_cache) {
         free(m->doc_cells);
         m->doc_cells = NULL;

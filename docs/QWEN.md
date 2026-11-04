@@ -16,10 +16,11 @@ teacher_samples 256
 top_k          8
 ```
 
-The teacher was queried at 256 token boundaries in the training split, and
-scored at the same full held-out positions used by the student. It is **worse
-than the 3-gram baseline** (48.14% top-1 / 3.420 BPC) on this task. Do not
-distill this checkpoint into a quality claim.
+The teacher was queried at 256 token boundaries in the training split, then
+scored on 128 sampled held-out positions. That card is itself too small; it is
+not a full-stream teacher comparison. It is **worse than the 3-gram baseline**
+(48.14% top-1 / 3.420 BPC on the full stream). Do not distill this checkpoint
+into a quality claim.
 
 ## Student results
 

@@ -366,7 +366,36 @@ variant scores 45.97% / 3.725 BPC at table 14; the learned mixer update was
 unstable and is disabled by default. The first mixer is a negative result, not
 a PAQ claim. The design and next steps are in [docs/MIXER.md](MIXER.md).
 
-## 14. Additional checks
+## 14. Qwen 7B teacher and the byte-student ceiling
+
+A Kaggle T4 run of Qwen2.5-7B-Instruct 4-bit produced:
+
+```
+teacher_top1  88.78%
+teacher_bpc   0.6606
+ngram_bpc     2.9757 (same token-boundary positions)
+```
+
+The teacher card passes. The byte-level students do not improve. On the full
+4,492-byte held-out stream:
+
+| teacher scale | 8-slot top-1 | 8-slot BPC |
+|---:|---:|---:|
+| 0 (ngram only) | **49.51%** | **3.4201** |
+| 8 | 46.75% | 3.6406 |
+| 16 | 47.60% | 3.5225 |
+| 32 | 47.86% | 3.4420 |
+
+The ngram-only 8-slot matches the n-gram BPC and slightly beats top-1; every
+non-zero teacher scale makes BPC worse. The raw 3-slot direct model remains
+**49.05% / 2.9593 BPC**.
+
+The conclusion is representational: a token-level teacher cannot be fully
+consumed by a byte-level 3/8-slot student through first-byte marginalization.
+The next model is token-level with 3–6 token context. See
+[QWEN7B.md](QWEN7B.md).
+
+## 15. Additional checks
 
 - ASan + UBSan builds of `test_word`, `test_vec`, `test_model`, and `test_ctx` pass.
 - The same pipeline was run with `--dim 512 --classes 8 --queries 16` and

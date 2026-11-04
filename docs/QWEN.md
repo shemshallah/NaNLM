@@ -1,5 +1,9 @@
 # Qwen teacher runner: first real run
 
+> **Update:** a Qwen2.5-7B run now exists. It passes the token-boundary teacher
+> card but still does not improve the byte-level student. See
+> [QWEN7B.md](QWEN7B.md) for the grid and the token-level conclusion.
+
 The `qwen-teacher` workflow now runs on GitHub Actions with an Apache-2.0
 Qwen2.5-0.5B-Instruct Q4_K_M GGUF teacher and a llama.cpp server.
 

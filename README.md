@@ -42,8 +42,12 @@ sampled contexts and was too small to separate the models.
 The continuous-training path is now closed end-to-end: pinned repository →
 license/secret-filtered chunks → additive shards → typed slot memory → `.nas` →
 `nanlm_vm`. Signed 32-bit shards make unlearning a re-merge; the 8-slot student
-and multi-order mixer exist, but their first results are negative. Model-size
-accounting is now part of the evidence.
+and multi-order mixer exist, but their first results are negative.
+
+A Qwen2.5-7B teacher now passes its token-boundary card (**88.8% / 0.66 BPC**)
+but does **not** improve the byte-level student. The ngram-only 8-slot control
+matches the n-gram BPC at 4,096 keys; the raw 3-slot memory still wins BPC.
+The next model is token-level. See [QWEN7B.md](docs/QWEN7B.md).
 
 ## What this is
 
@@ -197,6 +201,7 @@ The tests verify the parts that must not drift:
 - [Multi-order context mixing](docs/MIXER.md) — PAQ/lpaq-style template bank, integer mixer, and the first negative result.
 - [Packing and fast kernels](docs/PACKING.md) — bit-plane pages, VM conformance, additive HDC counters, and the T1/T2/T3 split.
 - [Qwen teacher runner](docs/QWEN.md) — the first real Qwen run, its teacher card, and why 0.5B/256 samples is not enough.
+- [Qwen 7B teacher result](docs/QWEN7B.md) — the T4 teacher card, the scale grid, and why the byte student cannot consume it.
 - [Free-GPU strategy](docs/GPU.md) — Modal batch teacher inference, free-tier options, and what not to spend GPU hours on.
 - [Kaggle runbook](docs/KAGGLE.md) — one script for a free T4/GPU session, with teacher, hybrid backoff, and student artifacts.
 - `kaggle_hybrid.py` — rebuild hybrid students from an existing 7B teacher shard without reloading the model.

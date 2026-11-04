@@ -114,3 +114,14 @@ The 3-slot BPC win is real (paired CI excludes zero); the top-1 difference is a
 tie. The 8-slot fixture-teacher and static-mixer rows are negatives, not
 verdicts on the 8-byte or PAQ directions. See `docs/EVAL.md`, `docs/QWEN.md`,
 and `docs/MIXER.md`.
+
+
+## 8. Qwen 7B teacher result
+
+The 7B teacher card is **88.78% top-1 / 0.6606 BPC** on 303 held-out token
+boundaries, but the byte-level student does not improve. A scale grid with the
+existing shard shows the ngram-only 8-slot control at **49.51% / 3.4201 BPC**;
+teacher scales 8, 16, and 32 are worse. The raw 3-slot model remains
+**49.05% / 2.9593 BPC**. This is a representation mismatch, not a teacher
+failure: token-level teachers need a token-level student. See
+`docs/QWEN7B.md`.

@@ -142,11 +142,25 @@ def main() -> int:
         print(f"wrote {WORK / ntr.name} and {WORK / card.name}")
         return 0
 
-    print("=== compile students ===", flush=True)
+    print("=== compile tools ===", flush=True)
     sh(["make", "build/nanlm_teacher", "build/nanlm_slot8_train",
         "build/nanlm_teacher_slot", "build/nanlm_asm", "build/nanlm_vm"],
        cwd=REPO, env=env)
+
+    # The teacher only observes token boundaries. The raw n-gram fills the
+    # byte contexts between boundaries, so the byte-level student is not
+    # coverage-starved. This is the hybrid that made the 0.5B student usable.
+    print("=== hybrid teacher (Qwen + corpus ngram) ===", flush=True)
+    corpus_size = corpus.stat().st_size
+    train_end = int(corpus_size * 0.85)
+    ngram = REPO / "build/qwen7b_ngram.ntr"
+    hybrid = REPO / "build/qwen7b_hybrid.ntr"
+    sh(["./build/nanlm_teacher", "build-ngram", str(corpus),
+        str(ngram), "0", str(train_end), "4"], cwd=REPO, env=env)
+    sh(["./build/nanlm_teacher", "merge", str(hybrid), str(ngram), str(ntr)],
+       cwd=REPO, env=env)
     sh(["./build/nanlm_teacher", "stats", str(ntr)], cwd=REPO, env=env)
+    sh(["./build/nanlm_teacher", "stats", str(hybrid)], cwd=REPO, env=env)
 
     slot8_tsv = REPO / "build/qwen7b_slot8.tsv"
     slot8_nas = REPO / "build/qwen7b_slot8.nas"
@@ -158,7 +172,7 @@ def main() -> int:
     slot3_man = REPO / "build/qwen7b_slot3.manifest"
 
     sh(["./build/nanlm_slot8_train",
-        "--teacher", str(ntr), "--corpus", str(corpus),
+        "--teacher", str(hybrid), "--corpus", str(corpus),
         "--max-keys", "2048", "--eval-log", str(slot8_tsv),
         "--out", str(slot8_nas), "--expected", str(slot8_exp),
         "--manifest", str(slot8_man)], cwd=REPO, env=env)
@@ -167,7 +181,7 @@ def main() -> int:
     sh(["./build/nanlm_vm", "--img", str(REPO / "build/qwen7b_slot8.nan"),
         "--steps", "600000000"], cwd=REPO, env=env)
     sh(["./build/nanlm_teacher_slot",
-        "--teacher", str(ntr), "--corpus", str(corpus),
+        "--teacher", str(hybrid), "--corpus", str(corpus),
         "--eval-log", str(slot3_tsv),
         "--out", str(slot3_nas), "--expected", str(slot3_exp),
         "--manifest", str(slot3_man)], cwd=REPO, env=env)
@@ -178,8 +192,8 @@ def main() -> int:
         "--boot", "5000"], cwd=REPO, env=env)
 
     print("=== package ===", flush=True)
-    files = [ntr, card, slot8_tsv, slot3_tsv, slot8_nas, slot8_exp,
-             slot8_man, slot3_nas, slot3_exp, slot3_man]
+    files = [ntr, card, ngram, hybrid, slot8_tsv, slot3_tsv, slot8_nas,
+             slot8_exp, slot8_man, slot3_nas, slot3_exp, slot3_man]
     tar = WORK / "qwen7b_run.tgz"
     sh(["tar", "czf", str(tar), "-C", str(REPO)] +
        [str(p.relative_to(REPO)) for p in files], env=env)

@@ -198,7 +198,7 @@ The tests verify the parts that must not drift:
 - [Packing and fast kernels](docs/PACKING.md) — bit-plane pages, VM conformance, additive HDC counters, and the T1/T2/T3 split.
 - [Qwen teacher runner](docs/QWEN.md) — the first real Qwen run, its teacher card, and why 0.5B/256 samples is not enough.
 - [Free-GPU strategy](docs/GPU.md) — Modal batch teacher inference, free-tier options, and what not to spend GPU hours on.
-- [Kaggle runbook](docs/KAGGLE.md) — one script for a free T4/GPU session, with teacher and student artifacts.
+- [Kaggle runbook](docs/KAGGLE.md) — one script for a free T4/GPU session, with teacher, hybrid backoff, and student artifacts.
 - [Modal GPU runbook](docs/MODAL.md) — install, authenticate, run one Qwen 7B teacher job, fetch the shard, and compile the student.
 - [AMD Radeon / ROCm runbook](docs/AMD_GPU.md) — Qwen 7B teacher commands for the AMD cloud box.
 - [AMD teacher notebook](notebooks/qwen7b_teacher.ipynb) — open in JupyterLab and run the whole Qwen 7B teacher/student gate.

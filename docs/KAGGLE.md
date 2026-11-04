@@ -93,6 +93,12 @@ Do not bring back the 7B model. The teacher shard is additive and small.
 If the teacher passes but the student loses, the next move is a larger teacher
 or a better corpus, not a larger student.
 
+## Token-level teacher
+
+After the byte result, the next GPU pass is token-level. See
+[TOKEN.md](TOKEN.md) and run `tools/hf_token_teacher.py` on the cached Qwen
+model. It emits NTT1 token shards, not NTR byte shards.
+
 ## 6. Kaggle-specific gotchas
 
 - Internet must be enabled; `git clone` and Hugging Face downloads use it.

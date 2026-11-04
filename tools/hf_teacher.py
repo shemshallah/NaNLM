@@ -72,6 +72,18 @@ def byte_layout(pieces: list[bytes]) -> tuple[bytes, list[int]]:
     return bytes(full), cumulative
 
 
+def build_ngram(data: bytes, end: int):
+    counts: dict[int, dict[int, int]] = defaultdict(lambda: defaultdict(int))
+    unigram = [0] * 256
+    total = 0
+    for i in range(2, max(2, end - 1)):
+        key = (data[i - 2] << 16) | (data[i - 1] << 8) | data[i]
+        counts[key][data[i + 1]] += 1
+        unigram[data[i + 1]] += 1
+        total += 1
+    return counts, unigram, total
+
+
 def first_byte(tokenizer, token_id: int,
                cache: dict[int, bytes]) -> int | None:
     piece = cache.get(token_id)
@@ -118,6 +130,11 @@ def run(args: argparse.Namespace) -> int:
         print("hf-teacher: warning: tokenizer round-trip differs from raw bytes",
               file=sys.stderr)
 
+    if args.device.startswith("cuda") and not torch.cuda.is_available():
+        print("hf-teacher: CUDA/ROCm device requested but torch.cuda is unavailable",
+              file=sys.stderr)
+        return 1
+    dtype = getattr(torch, args.dtype)
     kwargs = {
         "revision": args.revision,
         "trust_remote_code": True,
@@ -126,12 +143,12 @@ def run(args: argparse.Namespace) -> int:
     if args.load_in_4bit:
         kwargs["quantization_config"] = BitsAndBytesConfig(
             load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_compute_dtype=dtype,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True,
         )
     else:
-        kwargs["torch_dtype"] = torch.float16
+        kwargs["torch_dtype"] = dtype
     model = AutoModelForCausalLM.from_pretrained(args.model, **kwargs)
     model.eval()
 
@@ -140,6 +157,10 @@ def run(args: argparse.Namespace) -> int:
     eval_correct = 0
     eval_bits = 0.0
     train_tokens = int(len(ids) * args.train_frac)
+    train_byte_end = cumulative[train_tokens] if train_tokens < len(cumulative) else len(full_bytes)
+    ngram_counts, ngram_unigram, ngram_total = build_ngram(full_bytes, train_byte_end)
+    ngram_bits = 0.0
+    ngram_eval = 0
     overlap = max(8, args.overlap)
     chunk = max(32, args.chunk)
     written = 0
@@ -189,6 +210,18 @@ def run(args: argparse.Namespace) -> int:
                     kept = min(0.9, mass)
                     p_actual = p_actual * kept + (1.0 - kept) / 256.0
                     eval_bits += -math.log2(max(1e-12, p_actual))
+                    pos = cumulative[i + 1]
+                    if pos >= 3 and pos < len(full_bytes):
+                        key = ((full_bytes[pos - 3] << 16) |
+                               (full_bytes[pos - 2] << 8) |
+                               full_bytes[pos - 1])
+                        bucket = ngram_counts.get(key, {})
+                        c = bucket.get(full_bytes[pos], 0)
+                        t = sum(bucket.values())
+                        pu = (ngram_unigram[full_bytes[pos]] + 0.1) / (ngram_total + 0.1 * 256.0)
+                        p_ng = (c + 0.1 * pu) / (t + 0.1)
+                        ngram_bits += -math.log2(max(1e-12, p_ng))
+                        ngram_eval += 1
             if args.log_every and (start // chunk) % args.log_every == 0:
                 print(f"hf-teacher: tokens={min(start + chunk, len(ids))} "
                       f"records={len(records)}", file=sys.stderr)
@@ -207,6 +240,8 @@ def run(args: argparse.Namespace) -> int:
         "eval_positions": eval_positions,
         "teacher_top1": 100.0 * eval_correct / eval_positions if eval_positions else 0.0,
         "teacher_bpc": eval_bits / eval_positions if eval_positions else 0.0,
+        "ngram_eval": ngram_eval,
+        "ngram_bpc": ngram_bits / ngram_eval if ngram_eval else 0.0,
         "contexts": len({ctx for ctx, _ in records}),
         "records": len(records),
         "top_k": args.top_k,
@@ -239,6 +274,8 @@ def main() -> int:
     parser.add_argument("--overlap", type=int, default=16)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--device-map", default="auto")
+    parser.add_argument("--dtype", default="float16",
+                        choices=("float16", "bfloat16", "float32"))
     parser.add_argument("--load-in-4bit", action="store_true")
     parser.add_argument("--log-every", type=int, default=4)
     args = parser.parse_args()

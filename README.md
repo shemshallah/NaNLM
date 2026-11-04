@@ -198,6 +198,8 @@ The tests verify the parts that must not drift:
 - [Packing and fast kernels](docs/PACKING.md) — bit-plane pages, VM conformance, additive HDC counters, and the T1/T2/T3 split.
 - [Qwen teacher runner](docs/QWEN.md) — the first real Qwen run, its teacher card, and why 0.5B/256 samples is not enough.
 - [Free-GPU strategy](docs/GPU.md) — Modal batch teacher inference, free-tier options, and what not to spend GPU hours on.
+- [AMD Radeon / ROCm runbook](docs/AMD_GPU.md) — Qwen 7B teacher commands for the AMD cloud box.
+- [AMD teacher notebook](notebooks/qwen7b_teacher.ipynb) — open in JupyterLab and run the whole Qwen 7B teacher/student gate.
 - [Model 0](docs/MODEL_0.md) — a concrete, buildable first model.
 - [M2 plan](docs/M2_PLAN.md) — context binding, a real corpus, and negative gates.
 - [C adapter](docs/ADAPTER.md) — the S6 boundary and the `.nan` compiler.

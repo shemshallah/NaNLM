@@ -34,6 +34,9 @@ Do spend them on:
 
 Verify current quotas before relying on them. Free tiers change.
 
+For an AMD Radeon Cloud / ROCm box, use the step-by-step
+[AMD GPU runbook](AMD_GPU.md).
+
 ## The Modal app
 
 `modal_teacher.py` runs the batch Hugging Face teacher on one GPU function:

@@ -37,8 +37,17 @@ static void make_codebook(void) {
     if (codebook_ready) return;
     memset(codebook, 0, sizeof(codebook));
     for (block = 0; block < NANLM_SLOT_CTX_BYTES; block++) {
+        uint32_t max_j = 256u;
+#if NANLM_SLOT_CTX_BYTES == 8
+        /* Exponential recency bit budget: recent bytes dominate older bytes
+         * so flat Hamming distance implements longest-suffix backoff. */
+        static const uint32_t byte_bits[8] = {
+            4u, 8u, 12u, 20u, 32u, 128u, 192u, 256u
+        };
+        max_j = byte_bits[block];
+#endif
         for (i = 0; i < 256; i++) {
-            for (j = 1; j < 256; j++) {
+            for (j = 1; j < max_j; j++) {
                 if (parity8(i & j)) {
                     bit = j - 1;
                     codebook[((block * 256 + i) * NANLM_SLOT_CW) + bit / 32u] |=
@@ -48,9 +57,16 @@ static void make_codebook(void) {
         }
     }
     for (block = NANLM_SLOT_CTX_BYTES; block < NANLM_SLOT_N; block++) {
+        uint32_t max_j = 256u;
+#if NANLM_SLOT_CTX_BYTES == 8
+        static const uint32_t ctype_bits[8] = {
+            4u, 4u, 8u, 12u, 16u, 64u, 96u, 128u
+        };
+        max_j = ctype_bits[block - NANLM_SLOT_CTX_BYTES];
+#endif
         for (i = 0; i < 256; i++) {
             uint32_t code = ctype8(i);
-            for (j = 0; j < 256; j++) {
+            for (j = 0; j < max_j; j++) {
                 if ((code >> (j % 8u)) & 1u) {
                     codebook[((block * 256 + i) * NANLM_SLOT_CW) + j / 32u] |=
                         1u << (j % 32u);
@@ -274,7 +290,7 @@ nanlm_slot_model *nanlm_slot_build(const uint8_t *data, size_t len,
     m->nkeys = (uint32_t)nkeys;
     m->keys = (uint32_t *)calloc(nkeys * NANLM_SLOT_VW, sizeof(*m->keys));
     m->labels = (uint8_t *)calloc(nkeys, 1);
-    m->counts = (uint16_t *)calloc(nkeys * 256, sizeof(*m->counts));
+    m->counts = (uint32_t *)calloc(nkeys * 256, sizeof(*m->counts));
     m->totals = (uint32_t *)calloc(nkeys, sizeof(*m->totals));
     if (!m->keys || !m->labels || !m->counts || !m->totals) {
         nanlm_slot_free(m);
@@ -307,7 +323,7 @@ nanlm_slot_model *nanlm_slot_build(const uint8_t *data, size_t len,
             {
                 uint32_t b, bestb = 0, bestc = 0;
                 for (b = 0; b < 256; b++) {
-                    m->counts[k * 256 + b] = (uint16_t)(counts[b] > 65535 ? 65535 : counts[b]);
+                    m->counts[k * 256 + b] = counts[b];
                     if (counts[b] > bestc) { bestc = counts[b]; bestb = b; }
                 }
                 m->labels[k] = (uint8_t)bestb;
@@ -366,8 +382,13 @@ nanlm_slot_model *nanlm_slot_build(const uint8_t *data, size_t len,
             if (got == exp) hdc_correct++;
             {
                 double c = (double)m->counts[bi * 256 + exp];
-                double p = (c + m->alpha * ((double)m->unigram[exp] / (double)utot)) /
-                           ((double)m->totals[bi] + m->alpha);
+                double tot = (double)m->totals[bi];
+                double a = m->alpha;
+                if (tot > 1024.0 || best > 0) {
+                    a += 0.05 * tot + (best > 0 ? 0.5 * tot * ((double)best / 256.0) : 0.0);
+                }
+                double p = (c + a * ((double)m->unigram[exp] / (double)utot)) /
+                           (tot + a);
                 hdc_bpc += -log(p > 0 ? p : 1e-12) / log(2.0);
             }
             ngram_bpc += ngram_bpc_one(o3, n3, o2, n2, o1, n1, uni, utot,
@@ -417,6 +438,92 @@ fail:
 }
 #endif /* NANLM_SLOT_CTX_BYTES == 3 */
 
+
+int nanlm_slot_eval_stream(const nanlm_slot_model *m, const uint8_t *data,
+                           size_t len, size_t train_len,
+                           const char *log_path) {
+    FILE *fp = NULL;
+    uint32_t *o3 = NULL, *o2 = NULL, *o1 = NULL;
+    size_t n3 = 0, n2 = 0, n1 = 0;
+    size_t start, pos, n = 0;
+    uint64_t correct = 0, ngcorrect = 0;
+    double bits = 0.0, ngbits = 0.0;
+    double uni_total = 0.0;
+    int b;
+
+    if (!m || !data || len < 32 || train_len + NANLM_SLOT_CTX_BYTES >= len) {
+        return -1;
+    }
+    if (log_path) {
+        fp = fopen(log_path, "w");
+        if (!fp) return -1;
+        fprintf(fp, "pos actual pred slot_bits ngram_bits slot_correct ngram_correct\n");
+    }
+    for (b = 0; b < 256; b++) uni_total += (double)m->unigram[b];
+
+    o3 = obs_build(data, train_len, 3, &n3);
+    o2 = obs_build(data, train_len, 2, &n2);
+    o1 = obs_build(data, train_len, 1, &n1);
+    start = train_len + NANLM_SLOT_CTX_BYTES - 1;
+    for (pos = start; pos + 1 < len; pos++) {
+        uint8_t ctx[NANLM_SLOT_CTX_BYTES];
+        uint8_t actual = data[pos + 1];
+        uint8_t pred = 0;
+        uint32_t q[NANLM_SLOT_VW];
+        uint32_t best = UINT32_MAX, bi = 0, j;
+        double p_actual;
+        int ngc = 0;
+        double ngb;
+
+        slot_ctx(data, pos, ctx);
+        nanlm_slot_encode(m, ctx, q);
+        for (j = 0; j < m->nkeys; j++) {
+            uint32_t d = hamming_key(q, m->keys + j * NANLM_SLOT_VW);
+            if (d < best) { best = d; bi = j; }
+        }
+        pred = m->labels[bi];
+        if (pred == actual) correct++;
+
+        {
+            double c = (double)m->counts[bi * 256 + actual];
+            double total = (double)m->totals[bi];
+            double a = m->alpha;
+            double prior = uni_total > 0.0
+                               ? (double)m->unigram[actual] / uni_total
+                               : 0.0;
+            if (total > 1024.0 || best > 0) {
+                a += 0.05 * total + (best > 0 ? 0.5 * total * ((double)best / 256.0) : 0.0);
+            }
+            p_actual = (c + a * prior) / (total + a);
+            p_actual = p_actual > 1e-12 ? p_actual : 1e-12;
+        }
+        bits += -log(p_actual) / log(2.0);
+
+        ngb = ngram_bpc_one(o3, n3, o2, n2, o1, n1,
+                            m->unigram, uni_total ? (uint32_t)uni_total : 1,
+                            ctx + (NANLM_SLOT_CTX_BYTES - 3u),
+                            actual, &ngc);
+        ngbits += ngb;
+        if (ngc) ngcorrect++;
+        if (fp) {
+            fprintf(fp, "%zu %u %u %.8f %.8f %d %d\n",
+                    pos, actual, pred, -log(p_actual) / log(2.0), ngb,
+                    pred == actual ? 1 : 0, ngc);
+        }
+        n++;
+    }
+    free(o3); free(o2); free(o1);
+    if (fp && fclose(fp) != 0) return -1;
+    if (n == 0) return -1;
+    ((nanlm_slot_model *)m)->stream_n = n;
+    ((nanlm_slot_model *)m)->stream_top1 = 100.0 * (double)correct / (double)n;
+    ((nanlm_slot_model *)m)->stream_bpc = bits / (double)n;
+    ((nanlm_slot_model *)m)->stream_ngram_top1 =
+        100.0 * (double)ngcorrect / (double)n;
+    ((nanlm_slot_model *)m)->stream_ngram_bpc = ngbits / (double)n;
+    return 0;
+}
+
 void nanlm_slot_free(nanlm_slot_model *m) {
     if (!m) return;
     free(m->keys);
@@ -463,6 +570,13 @@ int nanlm_slot_write_manifest(const nanlm_slot_model *m, const char *path,
     fprintf(f, "calib_n %u\n", m->calib_n);
     fprintf(f, "eval_n %u\n", m->eval_n);
     fprintf(f, "alpha %.6f\n", m->alpha);
+    if (m->stream_n) {
+        fprintf(f, "stream_n %llu\n", (unsigned long long)m->stream_n);
+        fprintf(f, "stream_top1 %.6f\n", m->stream_top1);
+        fprintf(f, "stream_bpc %.6f\n", m->stream_bpc);
+        fprintf(f, "stream_ngram_top1 %.6f\n", m->stream_ngram_top1);
+        fprintf(f, "stream_ngram_bpc %.6f\n", m->stream_ngram_bpc);
+    }
     fprintf(f, "hdc_top1 %.6f\n", m->hdc_top1);
     fprintf(f, "hdc_bpc %.6f\n", m->hdc_bpc);
     fprintf(f, "ngram_top1 %.6f\n", m->ngram_top1);
@@ -859,7 +973,7 @@ nanlm_slot_model *nanlm_slot_build_counts(const nanlm_slot_count *counts,
     m->nkeys = (uint32_t)nkeys;
     m->keys = (uint32_t *)calloc(nkeys * NANLM_SLOT_VW, sizeof(*m->keys));
     m->labels = (uint8_t *)calloc(nkeys, 1);
-    m->counts = (uint16_t *)calloc(nkeys * 256, sizeof(*m->counts));
+    m->counts = (uint32_t *)calloc(nkeys * 256, sizeof(*m->counts));
     m->totals = (uint32_t *)calloc(nkeys, sizeof(*m->totals));
     if (!m->keys || !m->labels || !m->counts || !m->totals) {
         nanlm_slot_free(m);
@@ -886,7 +1000,7 @@ nanlm_slot_model *nanlm_slot_build_counts(const nanlm_slot_count *counts,
         }
         nanlm_slot_encode(m, ctx, m->keys + k * NANLM_SLOT_VW);
         for (b = 0; b < 256; b++) {
-            m->counts[k * 256 + b] = (uint16_t)(c[b] > 65535 ? 65535 : c[b]);
+            m->counts[k * 256 + b] = c[b];
             if (c[b] > bestc) { bestc = c[b]; bestb = b; }
         }
         m->labels[k] = (uint8_t)bestb;
@@ -927,8 +1041,13 @@ nanlm_slot_model *nanlm_slot_build_counts(const nanlm_slot_count *counts,
             if (m->labels[bi] == exp) hdc_correct++;
             {
                 double c = (double)m->counts[bi * 256 + exp];
-                double p = (c + m->alpha * ((double)m->unigram[exp] / (double)utot)) /
-                           ((double)m->totals[bi] + m->alpha);
+                double tot = (double)m->totals[bi];
+                double a = m->alpha;
+                if (tot > 1024.0 || best > 0) {
+                    a += 0.05 * tot + (best > 0 ? 0.5 * tot * ((double)best / 256.0) : 0.0);
+                }
+                double p = (c + a * ((double)m->unigram[exp] / (double)utot)) /
+                           (tot + a);
                 hdc_bpc += -log(p > 0 ? p : 1e-12) / log(2.0);
             }
             ngram_bpc += ngram_bpc_one(o3, n3, o2, n2, o1, n1, uni, utot,

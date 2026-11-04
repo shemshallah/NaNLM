@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
         }
         cnt[w].key = key;
         cnt[w].next = (uint8_t)next;
-        cnt[w].weight = (uint16_t)(sum > 65535 ? 65535 : sum);
+        cnt[w].weight = sum;
         w++;
     }
     data = read_file(corpus, &len);

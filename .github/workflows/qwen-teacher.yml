@@ -26,14 +26,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache llama-server and Qwen GGUF
+        id: cache-qwen
+        uses: actions/cache@v4
+        with:
+          path: |
+            llama-bin/
+            models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+          key: qwen05b-llama-server-v2
+
       - name: Build llama.cpp server
+        if: steps.cache-qwen.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
           cmake -S llama.cpp -B llama.cpp/build \
-            -DGGML_NATIVE=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release
+            -DGGML_NATIVE=OFF -DLLAMA_CURL=OFF -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_BUILD_TYPE=Release
           cmake --build llama.cpp/build --config Release -j2 --target llama-server
+          mkdir -p llama-bin
+          cp llama.cpp/build/bin/llama-server llama-bin/llama-server
 
       - name: Fetch Qwen 0.5B teacher (Apache-2.0)
+        if: steps.cache-qwen.outputs.cache-hit != 'true'
         run: |
           mkdir -p models
           curl -L --retry 3 -o models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
@@ -42,9 +56,9 @@ jobs:
       - name: Start llama-server
         run: |
           mkdir -p build
-          nohup llama.cpp/build/bin/llama-server \
+          nohup ./llama-bin/llama-server \
             -m models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
-            -c 4096 --host 127.0.0.1 --port 8080 \
+            -c 2048 --host 127.0.0.1 --port 8080 \
             > build/server.log 2>&1 &
           echo $! > build/server.pid
           for i in $(seq 1 180); do
@@ -58,19 +72,29 @@ jobs:
           cat build/server.log >&2
           exit 1
 
-      - name: Emit Qwen teacher shard
+      - name: Emit Qwen teacher shard and teacher card
         run: |
           python3 tools/qwen_teacher.py \
             --server http://127.0.0.1:8080 \
             --corpus "${{ inputs.corpus }}" \
             --out build/qwen_teacher.ntr \
+            --card build/qwen_card.json \
+            --include-eval-contexts \
             --top-k "${{ inputs.top_k }}" \
             --max-samples "${{ inputs.max_samples }}"
+          cat build/qwen_card.json
 
-      - name: Compile 8-slot student
+      - name: Compile and run 8-slot and 3-slot students on nanlm_vm
         run: |
-          make build/nanlm_teacher build/nanlm_slot8_train build/nanlm_asm build/nanlm_vm
+          make build/nanlm_teacher build/nanlm_slot8_train build/nanlm_teacher_slot build/nanlm_asm build/nanlm_vm
           ./build/nanlm_teacher stats build/qwen_teacher.ntr
+          SIZE=$(wc -c < "${{ inputs.corpus }}")
+          TRAIN_END=$((SIZE * 85 / 100))
+          ./build/nanlm_teacher build-ngram "${{ inputs.corpus }}" build/base_ngram.ntr 0 "$TRAIN_END" 4
+          ./build/nanlm_teacher merge build/qwen_hybrid.ntr build/base_ngram.ntr build/qwen_teacher.ntr
+          ./build/nanlm_teacher stats build/qwen_hybrid.ntr
+
+          echo "=== Pure Qwen 8-slot student ==="
           ./build/nanlm_slot8_train \
             --teacher build/qwen_teacher.ntr \
             --corpus "${{ inputs.corpus }}" \
@@ -79,12 +103,33 @@ jobs:
             --expected build/qwen_slot8.expected \
             --manifest build/qwen_slot8.manifest
           ./build/nanlm_asm build/qwen_slot8.nas build/qwen_slot8.nan
+          ./build/nanlm_vm --img build/qwen_slot8.nan --steps 600000000 \
+            > build/qwen_slot8.out 2> build/qwen_slot8.err
+          grep -q "rc=3, .*trap=''" build/qwen_slot8.err
+          diff -u build/qwen_slot8.expected build/qwen_slot8.out
+          echo "qwen_slot8 VM diff: PASS"
+
+          echo "=== Hybrid (Qwen + corpus shard) 8-slot student ==="
+          ./build/nanlm_slot8_train \
+            --teacher build/qwen_hybrid.ntr \
+            --corpus "${{ inputs.corpus }}" \
+            --max-keys 2048 \
+            --out build/qwen_hybrid_slot8.nas \
+            --expected build/qwen_hybrid_slot8.expected \
+            --manifest build/qwen_hybrid_slot8.manifest
+
+          echo "=== Hybrid (Qwen + corpus shard) 3-slot student ==="
+          ./build/nanlm_teacher_slot \
+            --teacher build/qwen_hybrid.ntr \
+            --corpus "${{ inputs.corpus }}" \
+            --out build/qwen_hybrid_slot3.nas \
+            --expected build/qwen_hybrid_slot3.expected \
+            --manifest build/qwen_hybrid_slot3.manifest
 
       - name: Stop server
         if: always()
         run: |
           if [ -f build/server.pid ]; then kill "$(cat build/server.pid)" || true; fi
-          cat build/server.log || true
 
       - name: Upload teacher and student artifacts
         if: always()
@@ -92,10 +137,14 @@ jobs:
         with:
           name: qwen-teacher-slot8
           path: |
+            build/qwen_card.json
             build/qwen_teacher.ntr
+            build/qwen_hybrid.ntr
             build/qwen_slot8.nas
             build/qwen_slot8.expected
             build/qwen_slot8.manifest
             build/qwen_slot8.nan
+            build/qwen_hybrid_slot8.manifest
+            build/qwen_hybrid_slot3.manifest
             build/server.log
           if-no-files-found: warn

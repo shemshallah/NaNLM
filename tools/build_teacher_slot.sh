@@ -8,8 +8,10 @@ TMP=${TMPDIR:-"$ROOT/build/teacher_slot_tmp"}
 mkdir -p "$TMP" "$ROOT/build"
 make -C "$ROOT" build/nanlm_teacher build/nanlm_teacher_slot build/nanlm_asm build/nanlm_vm >/dev/null
 
+SIZE=$(wc -c < "$ROOT/data/alice_excerpt.txt")
+TRAIN_END=$((SIZE * 85 / 100))
 "$ROOT/build/nanlm_teacher" build-ngram "$ROOT/data/alice_excerpt.txt" \
-    "$TMP/teacher.ntr" 0 0 4 >/dev/null
+    "$TMP/teacher.ntr" 0 "$TRAIN_END" 4 >/dev/null
 "$ROOT/build/nanlm_teacher_slot" \
     --teacher "$TMP/teacher.ntr" \
     --corpus "$ROOT/data/alice_excerpt.txt" \

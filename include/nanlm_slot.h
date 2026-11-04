@@ -38,14 +38,14 @@ typedef uint64_t nanlm_slot_key;
 typedef struct {
     nanlm_slot_key key;   /* packed context bytes, oldest byte high */
     uint8_t next;
-    uint16_t weight;
+    uint32_t weight;
 } nanlm_slot_count;
 
 typedef struct {
     uint32_t nkeys;
     uint32_t *keys;    /* nkeys * NANLM_SLOT_VW payload words */
     uint8_t *labels;   /* nkeys majority next byte */
-    uint16_t *counts;  /* nkeys * 256 next-byte counts */
+    uint32_t *counts;  /* nkeys * 256 next-byte counts */
     uint32_t *totals;  /* nkeys */
     uint32_t unigram[256];
 
@@ -56,6 +56,8 @@ typedef struct {
 
     uint32_t calib_n, eval_n;
     double hdc_top1, hdc_bpc, ngram_top1, ngram_bpc;
+    uint64_t stream_n;
+    double stream_top1, stream_bpc, stream_ngram_top1, stream_ngram_bpc;
     double alpha;
 } nanlm_slot_model;
 
@@ -77,6 +79,9 @@ int nanlm_slot_predict(const nanlm_slot_model *m,
                        uint8_t *out_next);
 uint32_t nanlm_slot_hash(const uint32_t key[NANLM_SLOT_VW]);
 
+int nanlm_slot_eval_stream(const nanlm_slot_model *m, const uint8_t *data,
+                           size_t len, size_t train_len,
+                           const char *log_path);
 int nanlm_slot_emit_nas(const nanlm_slot_model *m, const char *path);
 int nanlm_slot_write_expected(const nanlm_slot_model *m, const char *path);
 int nanlm_slot_write_manifest(const nanlm_slot_model *m, const char *path,

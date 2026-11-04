@@ -93,14 +93,14 @@ int nanlm_teacher_build_ngram(const uint8_t *data, size_t start, size_t end,
                 best[bestj] = (uint8_t)b;
             }
         }
-        for (b = 0; b < nb; b++) sumw += (uint32_t)(prob[best[b]] * 65535.0);
+        for (b = 0; b < nb; b++) sumw += (uint32_t)(prob[best[b]] * 1024.0);
         if (sumw == 0) sumw = 1;
         for (b = 0; b < nb; b++) {
+            uint32_t w = (uint32_t)((prob[best[b]] * 1024.0) *
+                                    (256.0 / (double)sumw));
             rec[nrec].context = nanlm_teacher_key(ctx);
             rec[nrec].next = best[b];
-            rec[nrec].weight = (uint16_t)((prob[best[b]] * 65535.0) *
-                                          (65535.0 / (double)sumw));
-            if (rec[nrec].weight == 0) rec[nrec].weight = 1;
+            rec[nrec].weight = (uint16_t)(w > 65535u ? 65535u : (w ? w : 1u));
             nrec++;
         }
     }

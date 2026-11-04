@@ -28,6 +28,8 @@ jobs:
         run: make model-ctx-check
       - name: shard merge gate
         run: make shard-check
+      - name: signed shard group gate
+        run: make shard2-check
       - name: shard -> typed slot gate
         run: make shard-slot-check
       - name: continuous code pipeline gate

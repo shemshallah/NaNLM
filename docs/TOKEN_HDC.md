@@ -129,3 +129,30 @@ specialization is still not earning its metadata cost.
 
 This is the gate the 2.40 BPC result must pass. A run that reports 2.40 BPC but
 hundreds of BPC of model overhead is not a Pareto win.
+
+## Top-k and model-size result
+
+With top-8 counts per prototype:
+
+| mode | active | stream BPC | sparse model | sparse + ngram total |
+|---|---:|---:|---:|---:|
+| regime | 0.69% | 2.5182 | 362,227 B | 901.60 BPC |
+| fixed | 2.25% | 2.5080 | 640,536 B | 1399.02 BPC |
+
+Top-8 truncation cost about 0.10 BPC versus the full teacher table. The sparse
+model is much smaller than dense (1.48 MB) but still dominates a 4.5 KB stream.
+The token n-gram fallback alone is 140,811 B.
+
+This is not Pareto. The next experiment is **prototype pruning**:
+
+```python
+!python experiments/token_hdc_ntt.py \
+  --ntt /kaggle/working/qwen7b_tokens.ntt \
+  --corpus /kaggle/working/NaNLM/data/alice_excerpt.txt \
+  --model Qwen/Qwen2.5-7B-Instruct \
+  --dim 2048 --mode regime --top-counts 8 --max-prototypes 512
+```
+
+The question is whether 512/1024/2048 prototypes retain the 2.5 BPC signal. If
+not, the teacher table is too specific for a compact model at this corpus size;
+the answer is more data, not a larger prototype matrix.

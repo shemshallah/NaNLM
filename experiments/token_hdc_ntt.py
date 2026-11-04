@@ -54,6 +54,8 @@ def main() -> int:
                    help="max Hamming fraction to trust an HDC prototype")
     p.add_argument("--top-counts", type=int, default=8,
                    help="top next-token counts stored per prototype")
+    p.add_argument("--max-prototypes", type=int, default=0,
+                   help="keep the highest-mass N teacher contexts (0=all)")
     p.add_argument("--teacher-weight", type=float, default=0.55)
     p.add_argument("--seed", type=int, default=1234)
     args = p.parse_args()
@@ -126,6 +128,16 @@ def main() -> int:
         return bundle3(parts[0], parts[1], parts[2])
 
     keys = list(teacher.keys())
+    if args.max_prototypes and len(keys) > args.max_prototypes:
+        mass = {k: sum(teacher[k].values()) for k in keys}
+        keys = sorted(keys, key=lambda k: -mass[k])[:args.max_prototypes]
+        teacher = {k: teacher[k] for k in keys}
+        teacher2 = defaultdict(lambda: defaultdict(int))
+        teacher1 = defaultdict(lambda: defaultdict(int))
+        for (t0, t1, t2), bucket in teacher.items():
+            for nxt, weight in bucket.items():
+                teacher2[(t1, t2)][nxt] += weight
+                teacher1[t2][nxt] += weight
     prototypes = np.stack([encode(k) for k in keys])
     P = pack_matrix(prototypes)
     labels = {k: max(teacher[k].items(), key=lambda kv: kv[1])[0] for k in keys}

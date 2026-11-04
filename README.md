@@ -206,7 +206,7 @@ The tests verify the parts that must not drift:
 - [In-VM plasticity](docs/PLASTICITY.md) — bit-sliced counters and STW truth-table search inside `nanlm_vm`.
 - [Token HDC prototype](docs/TOKEN_HDC.md) — token HDC + document cache, pruning, and the model-size/stream-size negative result.
 - [Sparse high-dimensional sweep](docs/SPARSE.md) — dimensions, active fraction, and noise fragility.
-- [Stream-size results](docs/STREAM_SIZE.md) — full-Alice 22 KB result and the 1.2 MB slot-model scaling failure.
+- [Stream-size results](docs/STREAM_SIZE.md) — full-Alice 22 KB, 1.2 MB slot-model failure, and the 1.2 MB mixer result.
 - [Free-GPU strategy](docs/GPU.md) — Modal batch teacher inference, free-tier options, and what not to spend GPU hours on.
 - [Kaggle runbook](docs/KAGGLE.md) — one script for a free T4/GPU session, with teacher, hybrid backoff, and student artifacts.
 - [Kaggle dataset linking](docs/KAGGLE_DATASETS.md) — persist the token shard and mount it with `/kaggle/input/...`.

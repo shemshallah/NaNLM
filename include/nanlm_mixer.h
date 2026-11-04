@@ -61,6 +61,7 @@ typedef struct {
 
 typedef struct {
     uint64_t eval_bytes;
+    uint64_t top1_n;
     double bpc;
     double top1;
     double ngram_bpc;
@@ -95,8 +96,8 @@ int nanlm_mixer_merge_counts(nanlm_mixer *dst, const nanlm_mixer *src,
  */
 int nanlm_mixer_train_eval(const uint8_t *data, size_t len, double train_frac,
                            uint32_t table_bits, int use_doc_cache,
-                           int online_adapt, const char *log_path,
-                           nanlm_mixer_report *out);
+                           int online_adapt, int top1_limit,
+                           const char *log_path, nanlm_mixer_report *out);
 
 #ifdef __cplusplus
 }

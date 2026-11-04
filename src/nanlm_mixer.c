@@ -487,15 +487,15 @@ static double ngram_bits(const uint32_t *o3, size_t n3,
 
 int nanlm_mixer_train_eval(const uint8_t *data, size_t len, double train_frac,
                            uint32_t table_bits, int use_doc_cache,
-                           int online_adapt, const char *log_path,
-                           nanlm_mixer_report *out) {
+                           int online_adapt, int top1_limit,
+                           const char *log_path, nanlm_mixer_report *out) {
     nanlm_mixer *m;
     size_t train_len, pos;
     uint32_t *o3 = NULL, *o2 = NULL, *o1 = NULL;
     size_t n3 = 0, n2 = 0, n1 = 0;
     uint32_t uni[256] = {0};
     uint32_t utot = 0;
-    uint64_t correct = 0, ngcorrect = 0, n = 0;
+    uint64_t correct = 0, ngcorrect = 0, n = 0, top1_n = 0;
     double bits = 0.0, ngbits = 0.0;
     FILE *fp = NULL;
     int i;
@@ -551,14 +551,18 @@ int nanlm_mixer_train_eval(const uint8_t *data, size_t len, double train_frac,
             nll += -log2(bit ? pd : 1.0 - pd);
             prefix = (prefix << 1) | bit;
         }
-        guess = nanlm_mixer_predict_byte(m, NULL);
-        if (guess == actual) correct++;
+        guess = -1;
+        if (top1_limit < 0 || top1_n < (uint64_t)top1_limit) {
+            guess = nanlm_mixer_predict_byte(m, NULL);
+            if (guess == actual) correct++;
+            top1_n++;
+        }
         ngb = ngram_bits(o3, n3, o2, n2, o1, n1, uni, utot, ctx3, actual, &ngc);
         ngbits += ngb;
         if (ngc) ngcorrect++;
         bits += nll;
         if (fp) {
-            fprintf(fp, "%zu %u %u %.8f %.8f %d %d\n",
+            fprintf(fp, "%zu %u %d %.8f %.8f %d %d\n",
                     pos, actual, guess, nll, ngb,
                     guess == actual ? 1 : 0, ngc);
         }
@@ -571,8 +575,9 @@ int nanlm_mixer_train_eval(const uint8_t *data, size_t len, double train_frac,
     free(o3); free(o2); free(o1);
     if (out) {
         out->eval_bytes = n;
+        out->top1_n = top1_n;
         out->bpc = n ? bits / (double)n : 0.0;
-        out->top1 = n ? 100.0 * (double)correct / (double)n : 0.0;
+        out->top1 = top1_n ? 100.0 * (double)correct / (double)top1_n : 0.0;
         out->ngram_bpc = n ? ngbits / (double)n : 0.0;
         out->ngram_top1 = n ? 100.0 * (double)ngcorrect / (double)n : 0.0;
         out->model_bytes = sizeof(*m) +

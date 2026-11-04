@@ -9,11 +9,14 @@ byte offset. D=2,048, vocab=256, context=3, 32 held-out contexts.
 
 | model | top-1 | n-gram top-1 | n-gram BPC | runtime |
 |---|---:|---:|---:|---:|
-| HDC 1 prototype/byte | 21.9% | 50.0% | 3.78 | ~? |
-| HDC 2 prototypes/byte | 25.0% | 50.0% | 3.78 | ~? |
+| HDC 1 prototype/byte | 21.9% | 50.0% | 3.78 | not measured |
+| HDC 2 prototypes/byte | 25.0% | 50.0% | 3.78 | not measured |
 | HDC 4 prototypes/byte | 25.0% | 50.0% | 3.78 | 70.3M steps |
 | HDC 8 prototypes/byte | **34.4%** | 50.0% | 3.78 | 140.4M steps |
 | HDC 16 prototypes/byte | 28.1% | 50.0% | 3.78 | 280.8M steps |
+
+All numbers use only 32 held-out contexts. The standard error is large: one
+query is 3.1 percentage points. Do not treat the cluster ranking as settled.
 
 The n-gram wins on quality. The HDC model is real, runs as a `.nan` image, and
 matches the C adapter on every predicted byte and hash, but it is not
@@ -27,6 +30,33 @@ competitive.
   exactly, so the runtime is doing the binding/bundling correctly.
 - HDC probability calibration is not implemented. Do not report HDC bits/byte
   until a temperature or readout is selected on held-out data.
+
+### Dimension sweep at 8 prototypes/byte
+
+| D | top-1 |
+|---:|---:|
+| 1,024 | 25.0% |
+| 1,536 | 21.9% |
+| 2,048 | **34.4%** |
+| 2,560 | 31.3% |
+| 4,096 | 31.3% |
+| 8,192 | 28.1% |
+
+Bigger D did not help. That points at the memory/decoder, not raw capacity.
+
+### Exemplar memory, first-K (negative)
+
+First K training contexts per class, nearest exemplar:
+
+| K | top-1 |
+|---:|---:|
+| 4 | 3.1% |
+| 8 | 9.4% |
+| 16 | 21.9% |
+
+This is worse than the majority prototypes. First-K sampling is biased to the
+start of the corpus. A reservoir or k-means selection is the next version, not
+this one.
 
 ### Hypotheses
 

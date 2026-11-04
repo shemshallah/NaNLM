@@ -9,7 +9,8 @@ static void usage(const char *argv0) {
             "usage: %s [--corpus FILE] [--out FILE] [--expected FILE]\n"
             "          [--manifest FILE] [--dim BITS] [--queries N]\n"
             "          [--train-frac F] [--seed HEX] [--clusters N]\n"
-            "          [--zero-positions] [--swap01] [--swap-predicted]\n",
+            "          [--zero-positions] [--swap01] [--swap-predicted]\n"
+            "          [--exemplar]\n",
             argv0);
 }
 
@@ -68,6 +69,7 @@ int main(int argc, char **argv) {
     int zero_positions = 0;
     int swap01 = 0;
     int swap_predicted = 0;
+    int exemplar = 0;
     unsigned char *data;
     size_t len = 0;
     nanlm_lm_model *m;
@@ -89,6 +91,7 @@ int main(int argc, char **argv) {
         else if (strcmp(a, "--zero-positions") == 0) { zero_positions = 1; }
         else if (strcmp(a, "--swap01") == 0) { swap01 = 1; }
         else if (strcmp(a, "--swap-predicted") == 0) { swap_predicted = 1; }
+        else if (strcmp(a, "--exemplar") == 0) { exemplar = 1; }
         else { usage(argv[0]); return 2; }
     }
 
@@ -109,6 +112,7 @@ int main(int argc, char **argv) {
         free(data);
         return 1;
     }
+    m->exemplar = exemplar;
     if (nanlm_lm_train(m, data, len, train_frac, seed) != 0) {
         fprintf(stderr, "training failed\n");
         goto done;

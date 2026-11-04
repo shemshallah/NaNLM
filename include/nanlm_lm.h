@@ -43,6 +43,7 @@ typedef struct {
     double ngram_top1;
     double hdc_bpc;
     double ngram_bpc;
+    int exemplar; /* 0 = majority prototypes, 1 = first-K contexts */
 } nanlm_lm_model;
 
 nanlm_lm_model *nanlm_lm_model_new(uint32_t dim, uint32_t vocab,

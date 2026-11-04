@@ -93,6 +93,7 @@ nanlm_lm_model *nanlm_lm_model_new_clusters(uint32_t dim, uint32_t vocab,
             nanlm_lm_model_free(m);
             return NULL;
         }
+        nanlm_vec_zero(m->prototypes[i]);
     }
     for (i = 0; i < NANLM_LM_CTX; i++) {
         m->positions[i] = nanlm_vec_new(m->words);
@@ -189,6 +190,7 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
     uint32_t c, w, b, i;
     uint32_t *ones = NULL;
     uint32_t *total = NULL;
+    uint32_t *seen = NULL;
     nanlm_vec *q = NULL;
     Pair *pairs = NULL;
     size_t npairs = 0;
@@ -209,14 +211,20 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
         nanlm_vec_random(m->positions[i], &state);
     }
 
-    ones = (uint32_t *)calloc((size_t)m->vocab * m->clusters * m->dim,
-                              sizeof(*ones));
-    total = (uint32_t *)calloc((size_t)m->vocab * m->clusters,
-                               sizeof(*total));
+    if (m->exemplar) {
+        seen = (uint32_t *)calloc(m->vocab, sizeof(*seen));
+        if (!seen) return -1;
+    } else {
+        ones = (uint32_t *)calloc((size_t)m->vocab * m->clusters * m->dim,
+                                  sizeof(*ones));
+        total = (uint32_t *)calloc((size_t)m->vocab * m->clusters,
+                                   sizeof(*total));
+    }
     q = nanlm_vec_new(m->words);
-    if (!ones || !total || !q) {
+    if ((!m->exemplar && (!ones || !total)) || (m->exemplar && !seen) || !q) {
         free(ones);
         free(total);
+        free(seen);
         nanlm_vec_free(q);
         return -1;
     }
@@ -231,10 +239,16 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
         if (nanlm_lm_encode(m, ids, q) != 0) {
             free(ones);
             free(total);
+            free(seen);
             nanlm_vec_free(q);
             return -1;
         }
-        {
+        if (m->exemplar) {
+            uint32_t slot = seen[cls] % m->clusters;
+            nanlm_vec *dst = m->prototypes[cls * m->clusters + slot];
+            memcpy(dst->w, q->w, m->words * sizeof(*q->w));
+            seen[cls]++;
+        } else {
             uint32_t pidx = cls * m->clusters +
                             (nanlm_lm_hash(q) & (m->clusters - 1u));
             total[pidx]++;
@@ -249,16 +263,18 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
         }
     }
 
-    for (c = 0; c < m->vocab * m->clusters; c++) {
-        for (w = 0; w < m->words; w++) {
-            uint32_t p = 0;
-            for (b = 0; b < 32u; b++) {
-                size_t idx = (size_t)c * m->dim + w * 32u + b;
-                if ((uint64_t)ones[idx] * 2u > (uint64_t)total[c]) {
-                    p |= (1u << b);
+    if (!m->exemplar) {
+        for (c = 0; c < m->vocab * m->clusters; c++) {
+            for (w = 0; w < m->words; w++) {
+                uint32_t p = 0;
+                for (b = 0; b < 32u; b++) {
+                    size_t idx = (size_t)c * m->dim + w * 32u + b;
+                    if ((uint64_t)ones[idx] * 2u > (uint64_t)total[c]) {
+                        p |= (1u << b);
+                    }
                 }
+                m->prototypes[c]->w[w] = nan16_make(p, NAN16_N_DATA);
             }
-            m->prototypes[c]->w[w] = nan16_make(p, NAN16_N_DATA);
         }
     }
 
@@ -268,6 +284,7 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
     if (qend <= qstart) {
         free(ones);
         free(total);
+        free(seen);
         nanlm_vec_free(q);
         return -1;
     }
@@ -283,6 +300,7 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
         if (nanlm_lm_encode(m, ids, m->queries[qi]) != 0) {
             free(ones);
             free(total);
+            free(seen);
             nanlm_vec_free(q);
             return -1;
         }
@@ -298,6 +316,7 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
         if (nanlm_lm_predict(m, m->queries[qi], &got) != 0) {
             free(ones);
             free(total);
+            free(seen);
             nanlm_vec_free(q);
             return -1;
         }
@@ -325,6 +344,7 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
         if (!pairs) {
             free(ones);
             free(total);
+            free(seen);
             nanlm_vec_free(q);
             return -1;
         }
@@ -370,6 +390,7 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
     free(pairs);
     free(ones);
     free(total);
+    free(seen);
     nanlm_vec_free(q);
     return 0;
 }

@@ -151,6 +151,7 @@ The tests verify the parts that must not drift:
 - [Open-source lifecycle](docs/OPEN_SOURCE.md) — why mergeable counting is a world effort, stage by stage.
 - [Alien architecture](docs/ALIEN.md) — self-modifying regimes, mirror law, and what failed.
 - [Heterogeneous layers](docs/LAYERS.md) — one word, different interpretations per layer.
+- [Layer test plan](docs/LAYER_TESTS.md) — per-layer NaN use, tests, and stop conditions.
 - [Model 0](docs/MODEL_0.md) — a concrete, buildable first model.
 - [M2 plan](docs/M2_PLAN.md) — context binding, a real corpus, and negative gates.
 - [C adapter](docs/ADAPTER.md) — the S6 boundary and the `.nan` compiler.

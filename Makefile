@@ -67,6 +67,10 @@ regime-check: $(BUILD)/nanlm_asm $(BUILD)/nanlm_vm
 	./$(BUILD)/nanlm_vm --img $(BUILD)/regime.nan --steps 100000 > $(BUILD)/regime.out 2> $(BUILD)/regime.err
 	grep -q "rc=3, .*trap=''" $(BUILD)/regime.err
 	grep -qx PASS $(BUILD)/regime.out
+	./$(BUILD)/nanlm_asm tests/regime_all.nas $(BUILD)/regime_all.nan
+	./$(BUILD)/nanlm_vm --img $(BUILD)/regime_all.nan --steps 100000 > $(BUILD)/regime_all.out 2> $(BUILD)/regime_all.err
+	grep -q "rc=3, .*trap=''" $(BUILD)/regime_all.err
+	grep -qx PASS $(BUILD)/regime_all.out
 
 lane-check: $(BUILD)/nanlm_asm $(BUILD)/nanlm_vm
 	./$(BUILD)/nanlm_asm tests/lane.nas $(BUILD)/lane.nan

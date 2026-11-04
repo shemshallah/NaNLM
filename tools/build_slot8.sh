@@ -16,10 +16,15 @@ mkdir -p "$OUT" "$ROOT/models"
 make -C "$ROOT" build/nanlm_teacher build/nanlm_slot8_train \
     build/nanlm_asm build/nanlm_vm >/dev/null
 
-SIZE=$(wc -c < "$CORPUS")
-TRAIN_END=$((SIZE * 85 / 100))
-"$ROOT/build/nanlm_teacher" build-ngram "$CORPUS" "$OUT/teacher.ntr" \
-    0 "$TRAIN_END" 4 > "$OUT/teacher.log"
+if [ -n "${TEACHER:-}" ]; then
+    cp "$TEACHER" "$OUT/teacher.ntr"
+    echo "slot8: using supplied teacher $TEACHER" > "$OUT/teacher.log"
+else
+    SIZE=$(wc -c < "$CORPUS")
+    TRAIN_END=$((SIZE * 85 / 100))
+    "$ROOT/build/nanlm_teacher" build-ngram "$CORPUS" "$OUT/teacher.ntr" \
+        0 "$TRAIN_END" 4 > "$OUT/teacher.log"
+fi
 cat "$OUT/teacher.log"
 "$ROOT/build/nanlm_slot8_train" \
     --teacher "$OUT/teacher.ntr" --corpus "$CORPUS" --max-keys "$MAX_KEYS" \

@@ -41,7 +41,7 @@ typedef struct {
     nanlm_mix_cell *doc_cells; /* 3 * doc_buckets * NANLM_MIX_WAYS */
 
     /* 64 regimes x 16 inputs, Q8 fixed-point weights */
-    int16_t weights[NANLM_MIX_REGIMES][NANLM_MIX_INPUTS];
+    int32_t weights[NANLM_MIX_REGIMES][NANLM_MIX_INPUTS]; /* Q16 fixed-point */
 
     /* Rolling byte history and hash index for the match model */
     uint8_t *ring;

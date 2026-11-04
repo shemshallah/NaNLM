@@ -158,3 +158,31 @@ This is not Pareto. The next experiment is **prototype pruning**:
 The question is whether 512/1024/2048 prototypes retain the 2.5 BPC signal. If
 not, the teacher table is too specific for a compact model at this corpus size;
 the answer is more data, not a larger prototype matrix.
+
+## HDC + document cache result
+
+With the causal document cache carried into the HDC evaluator:
+
+| mode | HDC + doc BPC | sparse model | sparse + ngram total |
+|---|---:|---:|---:|
+| regime | 2.3020 | 362,227 B | 901.60 BPC |
+| fixed | 2.2928 | 640,536 B | 1399.02 BPC |
+| teacher lookup + doc cache | **2.1509** | — | — |
+
+The HDC path closes part of the gap (2.518 → 2.29) but remains worse than the
+teacher lookup. It also remains much larger than a 4.5 KB stream can amortize.
+
+The HDC top-1 now includes the document cache in its argmax; the BPC table above
+is the current reference.
+
+## Prototype pruning
+
+The next command is:
+
+```text
+--max-prototypes 1024
+```
+
+and then 512. The question is whether the 2.29 BPC signal survives at a model
+size small enough to be Pareto. If it does not, the teacher table is too
+specific for this corpus size; more data — not more dimensions — is the answer.

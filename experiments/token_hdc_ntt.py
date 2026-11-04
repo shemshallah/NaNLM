@@ -263,10 +263,36 @@ def main() -> int:
                 doc_uni, doc_utot, vocab, taus=(1.0, 2.0, 3.0),
             )
             p_dy = 0.25 * p_doc + 0.75 * p_h
+            # Top-1 must also include the document cache, not just p_h.
+            cands2 = set(cands)
+            if use_bucket:
+                cands2.update(use_bucket.keys())
+            for b in (doc3.get(c3), doc2.get(c2), doc1.get(c1)):
+                if b:
+                    cands2.update(b.keys())
+            best_dy = max(cands2, key=lambda w: (
+                0.25 * hierarchical_prob(
+                    w, doc3.get(c3), doc3_tot.get(c3, 0),
+                    doc2.get(c2), doc2_tot.get(c2, 0),
+                    doc1.get(c1), doc1_tot.get(c1, 0),
+                    doc_uni, doc_utot, vocab, taus=(1.0, 2.0, 3.0),
+                )
+                + 0.75 * (
+                    args.teacher_weight * bucket_prob(use_bucket, w)
+                    + (1.0 - args.teacher_weight) * hierarchical_prob(
+                        w, g3.get(c3), t3.get(c3, 0), g2.get(c2), t2.get(c2, 0),
+                        g1.get(c1), t1.get(c1, 0), uni, utot, vocab,
+                    )
+                    if use_bucket else hierarchical_prob(
+                        w, g3.get(c3), t3.get(c3, 0), g2.get(c2), t2.get(c2, 0),
+                        g1.get(c1), t1.get(c1, 0), uni, utot, vocab,
+                    )
+                )
+            )) if cands2 else best_h
         else:
             p_dy, best_dy = p_h, best_h
         bits_dy += -math.log2(p_dy)
-        if best_h == actual:
+        if best_dy == actual:
             correct_dy += 1
         doc3[c3][actual] += 1; doc3_tot[c3] += 1
         doc2[c2][actual] += 1; doc2_tot[c2] += 1

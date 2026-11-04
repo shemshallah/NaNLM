@@ -29,6 +29,7 @@ from pathlib import Path
 import modal
 
 app = modal.App("nanlm-teacher")
+GPU = os.environ.get("NANLM_GPU", "A10G")
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -49,7 +50,7 @@ shard_cache = modal.Volume.from_name("nanlm-teacher-shards", create_if_missing=T
 
 @app.function(
     image=image,
-    gpu="A10G",
+    gpu=GPU,
     timeout=60 * 60,
     volumes={"/cache": hf_cache, "/out": shard_cache},
 )

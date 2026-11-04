@@ -27,7 +27,7 @@ for f in \
     models/qwen_0.5b/card.json models/qwen_0.5b/qwen_slot8.manifest \
     models/qwen_0.5b/qwen_hybrid_slot8.manifest \
     models/qwen_0.5b/qwen_hybrid_slot3.manifest \
-    modal_teacher.py tools/hf_teacher.py docs/GPU.md docs/AMD_GPU.md \
+    modal_teacher.py tools/hf_teacher.py docs/GPU.md docs/AMD_GPU.md docs/MODAL.md \
     notebooks/qwen7b_teacher.ipynb
 do
     if [ -f "$f" ]; then

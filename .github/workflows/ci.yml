@@ -1,0 +1,20 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host tests
+        run: make test
+      - name: VM lane gate
+        run: make lane-check
+      - name: M1 model gate
+        run: make model-check
+      - name: M2a context gate
+        run: make model-ctx-check

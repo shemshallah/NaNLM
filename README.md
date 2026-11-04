@@ -1,0 +1,149 @@
+# NaNLM
+
+**A high-dimensional Boolean model that lives in NaN16 words.**
+
+NaNLM is a standalone project. It uses the NaN16 word format studied from
+NaN/0S as its foundation, but it does **not** depend on the NaN/0S repository:
+NaNLM has its own assembler (`nanlm_asm`) and runtime (`nanlm_vm`).
+
+```
+ byte     b0 b1   |  b2 b3 b4 b5   |  b6 b7
+          FAR head |  32-bit payload | NEAR head
+          big-endian                 little-endian
+```
+
+The two heads produce a four-bit class nibble `n`. For `BOOL`, `n` is a truth
+table: 32 independent Boolean lanes run in one instruction. For every other
+op, `n` is a predicate over the machine flags. The same four bits do both jobs.
+
+NaNLM asks a different question from a dense transformer:
+
+> Can a useful model be built from a sparse population of these words, without
+> floating-point arithmetic, matrix multiplication, or backpropagation in the
+> machine?
+
+The first target is deliberately small and testable: an 8,192-bit
+hyperdimensional associative memory that predicts the next character in a
+short context. It is **not** a transformer competitor. It is a substrate
+experiment with a measurable baseline.
+
+**Status:** M1 and M2a pass. The NaN16 runtime now binds three codebook
+vectors with position vectors, bundles them by majority, hashes the encoded
+query, and classifies it. The 2,048-bit context model matches the C adapter on
+all 16 class labels and hashes. Negative gates prove that zeroed positions,
+swapped prototypes, and step starvation all fail the diff.
+
+## What this is
+
+- A **NaN16-native model format**: weights, codebook, and program are 64-bit
+  double-ended NaN words.
+- A **32-lane Boolean vector machine**: `BOOL.n` applies one of 16 two-input
+  functions to 32 bit positions at once.
+- A **sparse high-dimensional associative memory**: binding, bundling, Hamming
+  similarity, prototype memory.
+- A **C adapter** for training, packing, emitting `.nan` images, and verifying
+  the NaN runtime. The adapter is S6: a test bench, not the shipped machine.
+
+## What this is not
+
+- Not a floating-point neural network with NaNs as a storage trick.
+- Not a claim that NaN16 beats tensor cores.
+- Not a full C-to-NaN compiler in v0.
+- Not an LLM. The first model is a small associative predictor with honest
+  baselines.
+
+## The first real model (M2 target)
+
+M2a now exercises binding and bundling on a synthetic context model. M2b
+switches the vocabulary to bytes and adds a real corpus plus an n-gram
+baseline. The table below is the M2b target.
+
+`NaNLM-0` (working name):
+
+| property | value |
+|---|---|
+| vector dimension | 8,192 bits = 256 NaN words |
+| vocabulary | byte-level, 256 symbols |
+| context | 3 bound symbols, majority-bundled |
+| memory | one prototype per next-byte class |
+| similarity | Hamming distance / popcount |
+| training | integer bit-sliced counters in the C adapter |
+| inference | NaN16 `BOOL`, `ADD`, `SHL`, `SHR`, `LD`, `ST`, `JMP` |
+| arithmetic | integer only; no FP in the model |
+| model size | ~256 KB of NaN words including codebook |
+
+The point is not the score. The point is that every weight is a gated NaN
+word, every operation is a Boolean function, and the whole model can be
+inspected bit for bit.
+
+## Quick start
+
+```sh
+make test
+```
+
+To build, assemble, run, and diff the first model against the C adapter:
+
+```sh
+sh tools/build_model.sh
+```
+
+To run the M2a context model, which exercises binding/bundling and a
+query-vector hash gate:
+
+```sh
+sh tools/build_ctx.sh
+```
+
+M2a output is `CC HHHHHHHH`: two hex class digits, a space, and the FNV-1a hash
+of the encoded query vector. The negative gates zero the position vectors,
+swap prototypes 0/1, and starve the step budget; all three must fail.
+
+Everything runs locally: the model is assembled by `build/nanlm_asm` and
+executed by `build/nanlm_vm`. No external tree or native runtime is required.
+
+The first model is a 2,048-bit, 16-class synthetic prototype classifier. It is
+a pipeline proof, not a language model. M2a adds the actual HDC operations:
+`v_i = C[b_i] XOR P[i]`, `q = majority(v_0,v_1,v_2)`. M2b replaces the synthetic
+classes with bytes and a held-out text corpus.
+
+The tests verify the parts that must not drift:
+
+- the lane identity `BOOL.n(0xCCCCCCCC, 0xAAAAAAAA) == n * 0x11111111`;
+- the mirror law `BOOL.rot2(n)(a,b) == BOOL.n(~a,b)`;
+- both-face gate behaviour;
+- vector bind/bundle/Hamming against scalar references;
+- neutral data words and `BSWAPM` involution.
+
+## Documentation
+
+- [NaN16 study](docs/NAN16_STUDY.md) — the word format and its constraints, with provenance.
+- [Foundations](docs/FOUNDATIONS.md) — the full design argument.
+- [Model 0](docs/MODEL_0.md) — a concrete, buildable first model.
+- [M2 plan](docs/M2_PLAN.md) — context binding, a real corpus, and negative gates.
+- [C adapter](docs/ADAPTER.md) — the S6 boundary and the `.nan` compiler.
+- [VM and assembler](docs/VM.md) — NaNLM's own runtime, subset, and status codes.
+- [Roadmap](docs/ROADMAP.md) — what ships first, and what does not.
+- [Community plan](docs/COMMUNITY.md) — launch sequence, hooks, and anti-patterns.
+- [Evidence](docs/EVIDENCE.md) — the gates that have actually run.
+- [M1 retrospective](docs/M1_RETROSPECTIVE.md) — what the first pipeline proved, and did not.
+
+## Relationship to NaN16
+
+NaNLM uses the NaN16 word model: two legal NaN heads around a 32-bit payload,
+with the class nibble as truth table or predicate. The format is studied and
+credited in [docs/NAN16_STUDY.md](docs/NAN16_STUDY.md), but NaNLM owns its
+assembler, runtime, model format, training adapter, and gates.
+
+The final artifact is a `.nan` image. The C adapter may train and pack it, but
+the model must run on `nanlm_vm` without the adapter. That is the boundary that
+keeps this from becoming a C project with a NaN file extension.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). The short version: use NaN16 exactly,
+keep data neutral, make the model run as `.nan`, and add a gate that can fail.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

@@ -1,0 +1,256 @@
+**Deep brainstorm: the 32-lane BOOL and how far it can be pushed**
+
+Core fact we start from:
+
+``` 
+n is a 4-bit truth table.
+BOOL.n  does, for every bit position i = 0..31:
+    a_i = bit i of register A
+    b_i = bit i of register B
+    result_i = the bit of n that corresponds to (a_i, b_i)
+```
+
+That is 32 independent 2-input Boolean functions evaluated in one instruction. The “lane trick” (`BOOL_n(0xCCCCCCCC, 0xAAAAAAAA) == n * 0x11111111`) just makes the truth table itself visible as a broadcast.
+
+This is *not* a 32-wide SIMD ALU in the normal sense. It is a 32-wide **Boolean network evaluator** whose function is selected by a 4-bit constant that also serves as the MoE router and the predication mask. That dual-use is the actual genius of the design. Everything below tries to amplify *that* property rather than pretend it is a weak Tensor Core.
+
+### 1. Make the truth table itself a first-class, evolvable object
+
+Right now n is mostly a static 4-bit immediate or a class nibble pulled from a weight word.
+
+Improvements:
+
+- **Learnable n**. Allow an instruction that treats a register as a soft distribution over the 16 possible truth tables and samples or takes the mode. During training you can backprop through a straight-through estimator into the distribution over Boolean functions.
+- **n as a small neural net**. Instead of a pure 4-bit table, let n index into a tiny shared table of 16 learned 2-input Boolean functions that themselves can be updated. You keep the hardware simple (still just a 4-bit select) while the *meaning* of each of the 16 functions becomes plastic.
+- **Composition of tables**. New ops that take two n-values and produce a new n that is their functional composition, or their conjunction/disjunction in the lattice of Boolean functions. This lets the model build deeper Boolean circuits out of the 16 base functions without leaving the nibble world.
+
+### 2. Lift from 1-bit lanes to small vectors inside the lane
+
+Pure 1-bit is too weak for neural work. Keep the 32-lane structure but make each “lane” carry a little more state:
+
+- **2-bit or 4-bit lanes**. Re-interpret the 32-bit register as 16 × 2-bit or 8 × 4-bit values. The truth table n now becomes a function `{0,1,2,3}² → {0,1,2,3}` (or the 4-bit version). You still have massive data-parallel Boolean/ternary logic, but each lane can represent a small quantized activation or weight.
+- **Lane groups**. Treat the 32 bits as 8 groups of 4 bits. A single BOOL can now implement 8 parallel 4-bit → 4-bit functions chosen by n. This is enough to do small lookup-table layers or quantized linear layers with extreme regularity.
+- **Carry / popcount side channel**. Add a parallel popcount or carry-propagation that runs across the lanes in the same instruction. Suddenly you can do population counts, soft majority, or simple integer arithmetic that still lives inside the Boolean substrate.
+
+### 3. Multi-instruction Boolean circuits as the real “neuron”
+
+A single BOOL is weak. A short, predicated sequence of BOOLs is a small circuit.
+
+Improvements:
+
+- **Circuit macros**. Define a handful of named, optimizable sequences (majority-of-3, mux, full-adder, small comparator, etc.) that the assembler and the later GPU offload path both understand. The model can emit these macros; the runtime can either execute them as NaNLM BOOLs or lower them to a real SIMD instruction.
+- **Predicated circuit evaluation**. Because every instruction already predicates on the same n, you can evaluate an entire small circuit under a single routing decision. That is sparse activation of entire Boolean sub-networks.
+- **Learned circuit search**. During training, treat short BOOL sequences as candidate programs and use evolutionary or reinforcement methods (or even differentiable NAS-style search) to discover high-value Boolean circuits for particular expert roles.
+
+### 4. Hybrid Boolean + low-precision arithmetic inside the same register file
+
+Keep the pure BOOL path for routing, gating, and sparse logic, but add a second interpretation of the same 32 bits:
+
+- When the class nibble is in a certain range, the register is treated as 32 × 1-bit.
+- When it is in another range, the same bits are treated as 8 × 4-bit or 4 × 8-bit values and a different op (a tiny integer FMA or dot) is selected.
+
+The hardware (or the software VM) only needs two modes. The model learns when to stay in pure Boolean world and when to flip into the slightly richer arithmetic world. This is still far cheaper than a full floating-point pipeline, yet dramatically more useful for neural nets.
+
+### 5. Make the 32 lanes talk to each other more richly
+
+Right now the lanes are almost completely independent (except for the global n).
+
+Useful additions:
+
+- **Permute / butterfly ops** that rearrange the 32 bits according to a pattern also derived from n or from a small immediate. Suddenly you can do reductions, pairwise interactions, or even a tiny attention-like pattern across the lanes.
+- **Horizontal BOOL**. A version that reduces across lanes (AND-reduce, OR-reduce, majority, etc.) and broadcasts the result. This gives you global features without leaving the Boolean substrate.
+- **Lane-local memory**. A tiny 32-entry scratchpad (one bit or a few bits per lane) that persists across instructions. Now each lane has a little state, turning the 32-lane BOOL into a 32-cell cellular automaton or a tiny recurrent network that still fits in registers.
+
+### 6. Use the dual meaning of n as a feature, not a constraint
+
+n is simultaneously:
+
+- the Boolean function,
+- the MoE router,
+- the predication mask.
+
+That is extremely rare. Exploit it harder:
+
+- Different experts can be defined as different *preferred truth tables*. An expert is not just a set of weights; it is a preferred Boolean regime.
+- The act of routing *is* the act of selecting which Boolean universe the next few instructions live in. This is a much deeper form of conditional computation than normal MoE.
+- Self-modification can include evolving the preferred n of an expert, not only its weight pages. The expert’s “personality” is partly which Boolean functions it likes to live inside.
+
+### 7. Scaling the idea beyond 32 lanes without breaking the word
+
+If 32 becomes limiting:
+
+- Keep the 64-bit NaN word, but allow a “wide BOOL” mode that consumes two or four consecutive registers and evaluates a larger truth table or a multi-bit function across 64 or 128 lanes.
+- Or treat a whole page of neutral words as a giant shared Boolean lookup structure that many experts can index into. The 4-bit n becomes an index into a much richer learned Boolean library.
+
+### 8. What this could actually be good for
+
+If the above directions are pursued seriously, the 32-lane BOOL stops being “a weak ALU” and becomes something more interesting:
+
+- A native substrate for **sparse, high-dimensional Boolean neural networks** and **learned digital circuits**.
+- An extremely cheap, extremely parallel conditional computation engine whose routing decision *is* the choice of Boolean regime.
+- A natural home for neurosymbolic ideas, program synthesis, and models that mix continuous embeddings (living in the normal GPU plane) with discrete Boolean reasoning (living in the NaN plane).
+- A system where the “weights” of certain experts are literally the Boolean functions themselves, which can be inspected, verified, and evolved in a way that normal floating-point weights cannot.
+
+### Brutal bottom line on the 32-lane BOOL
+
+You will never make it competitive with a Tensor Core for dense linear algebra. That race is lost.
+
+You *can* make it the best substrate in existence for a particular style of computation: massively parallel, sparsely activated, self-modifying Boolean and low-bit circuit evaluation, where the routing decision and the computation are the same object.
+
+The improvements that matter are therefore not “make BOOL more like an FMA”. They are:
+
+- richer interpretations of the 32 bits,
+- learnable and composable truth tables,
+- short predicated Boolean circuits as the real computational primitive,
+- tight integration between the choice of n and the identity of the expert,
+- a clean escape hatch into real arithmetic when the Boolean world is no longer sufficient.
+
+Push in those directions and the 32-lane BOOL stops being a cute gimmick and becomes the conceptual heart of a genuinely different kind of model. That is the only way this particular idea has a deep future.
+
+**Deep continuum: Sparse High-Dimensional Boolean Neural Networks on the 32-lane BOOL substrate**
+
+We are no longer trying to approximate floating-point transformers. We are trying to make a *native* Boolean computational universe that is high-dimensional, extremely sparse, and self-modifying, using the 4-bit truth table nibble as both the atomic function and the routing/predication signal.
+
+### I. Foundational reframing
+
+A normal neural net says:  
+“Here is a dense real-valued vector. Apply linear maps + non-linearities.”
+
+A sparse high-dim Boolean net says:  
+“Here is a very high-dimensional binary (or small-integer) vector. Most coordinates are irrelevant most of the time. Computation consists of selecting tiny subsets of coordinates and applying Boolean or low-precision functions to them, where the *choice of which function* is itself part of the learned state.”
+
+The 32-lane BOOL is unusually well-suited to this because:
+
+- The function is chosen by a 4-bit object that already lives in the weight/expert representation.
+- Predication is free.
+- 32-way data parallelism is free.
+- The same object that selects the function can also select which expert (or which Boolean regime) is active.
+
+This is closer to a **learned, sparsely activated Boolean circuit family** than to a classical BNN or XNOR-Net.
+
+### II. Core architectural primitives (bleeding edge)
+
+**1. Truth-table embeddings / Boolean regime embeddings**
+
+Instead of embedding tokens into ℝᵈ, embed them into a distribution over the 16 possible 2-input Boolean functions (or a larger library of Boolean functions).  
+Each “neuron” or expert carries a preferred regime n.  
+Activation of an expert *is* entering that Boolean regime for a short window of instructions.
+
+This makes the discrete choice of computational universe a first-class latent variable.
+
+**2. Hyperdimensional Boolean vectors with binding via truth tables**
+
+Hyperdimensional computing (HDC / Vector Symbolic Architectures) normally uses high-dim bipolar vectors and binding via XOR or circular convolution.
+
+Here we can do binding with a learned or selected truth table:
+
+- Bind(A, B) = BOOL_n(A, B) for a chosen n
+- Different n give different algebraic properties (some are invertible, some are not, some are associative in limited ways, etc.)
+
+Because n itself can be dynamic and expert-dependent, you get a family of binding operators rather than a single fixed one. This is largely unexplored.
+
+**3. Sparse Boolean attention via regime agreement**
+
+Classic attention is softmax(QKᵀ)V.  
+Boolean analogue:
+
+- Queries and keys live in high-dim binary space.
+- Compatibility is measured by how many lanes agree under a particular truth table, or by whether they share a preferred regime n.
+- Only a tiny subset of positions whose regime matches the current router n are allowed to contribute (predication again).
+
+Result: extremely sparse, regime-gated attention that is native to the ISA.
+
+**4. Dynamic Boolean circuit experts**
+
+An expert is not a matrix. An expert is:
+
+- a small set of preferred truth tables,
+- a short program (sequence of predicated BOOLs + permutes + horizontal reductions),
+- a set of coordinate masks (which lanes / which higher-dimensional blocks it is allowed to touch).
+
+SPAWN creates a new such circuit. STW can edit its truth tables or its masks. The expert is literally a living Boolean program.
+
+**5. Multi-resolution lane hierarchy**
+
+- Level 0: 32 individual bits
+- Level 1: 8 groups of 4 bits (each group can be a 4-bit symbol)
+- Level 2: 4 groups of 8 bits
+- Level 3: the whole 32-bit word as one object
+
+Operations can act at any level, and the current n can select both the function *and* the resolution. This gives a crude but hardware-cheap form of multi-scale representation.
+
+### III. Training and plasticity ideas that fit the substrate
+
+**1. Evolutionary / genetic programming over Boolean circuits**
+
+Because the computational primitive is already a small circuit, you can run population-based search *inside* the model:
+
+- Each expert is an individual.
+- Mutation = changing a truth table, inserting/deleting a BOOL, changing a permute pattern.
+- Selection pressure comes from a local loss or from a global reward signal that is written back into the NaN journal.
+
+This is much more natural here than in a dense floating-point net.
+
+**2. Straight-through estimators on the discrete n**
+
+Treat the 4-bit n as a categorical variable. During the forward pass you sample or take argmax; during the backward pass you use a straight-through or Gumbel-softmax style estimator so that the *distribution* over truth tables can be learned with gradient descent.
+
+**3. Local Boolean Hebbian / Tsetlin-like rules**
+
+Tsetlin machines already learn Boolean clauses with simple team-based reinforcement.  
+You can implement a Tsetlin-style update rule that only needs the current n, the lane values, and a reward bit — exactly the kind of ultra-local update that can run in the NaN plane without a full optimizer state.
+
+**4. Regime-conditioned plasticity**
+
+Only the experts whose preferred n matches the current router n are allowed to update. This is sparsity of *learning*, not just sparsity of activation. It dramatically reduces interference.
+
+### IV. Scaling dimensions that actually matter for this paradigm
+
+Forget parameter count in the usual sense. The relevant scales become:
+
+- Dimensionality of the binary / small-integer vectors (thousands to millions of bits).
+- Number of distinct truth-table regimes the model has specialized.
+- Depth and width of the dynamic Boolean circuits that experts are allowed to grow.
+- Number of simultaneously active regimes (how wide the sparse activation is).
+- Lifetime and turnover rate of experts (how fast the population of Boolean programs evolves).
+
+A “big” model in this world is one that maintains a large, diverse, sparsely activated library of Boolean circuits living in a very high-dimensional binary space, not one that has 400B floating-point weights.
+
+### V. Hybridization without betraying the idea
+
+Pure Boolean is powerful for discrete structure, logic, binding, and sparse routing. It is weak for continuous geometry and high-precision accumulation.
+
+Clean hybrid:
+
+- The high-dimensional Boolean substrate does routing, binding, memory addressing, discrete reasoning, and expert selection.
+- A conventional (or quantized) embedding space does the continuous residual stream and the heavy linear maps.
+- The interface is a learned projection both ways: continuous → Boolean regime + sparse binary code, and Boolean state → continuous features.
+
+The NaNLM plane stays pure; the GPU plane stays conventional; the interesting intelligence lives in the dialogue between them.
+
+### VI. Research frontiers that are actually open
+
+These are not incremental:
+
+1. **Learned algebras of Boolean functions** — can a model discover useful higher-arity operations by composing the 16 base truth tables?
+2. **Boolean hyperdimensional computing with dynamic binding operators** — almost unexplored.
+3. **Self-modifying populations of Boolean circuits with selection pressure** — open-ended evolutionary computation inside a neural system.
+4. **Regime-sparse attention and memory** — attention whose sparsity pattern is itself a Boolean computation.
+5. **Verification and interpretability** — because large parts of the model are actual Boolean circuits, you can in principle apply formal methods, SAT, or model checking to pieces of it. This is a qualitative difference from normal nets.
+6. **Extreme sparsity regimes** — what happens when only 0.1% or 0.01% of the Boolean coordinates are active on any given step, but the ambient dimension is 10⁵–10⁶?
+
+### VII. Synthesis: what the improved 32-lane BOOL is aiming to become
+
+Not a better multiply-accumulate unit.
+
+It is aiming to become the native execution engine for a new class of model whose primary computational acts are:
+
+- selecting a Boolean regime,
+- activating a sparse subset of a very high-dimensional binary state,
+- running short, dynamic, predicated Boolean circuits on that subset,
+- binding and unbinding symbols in that space,
+- and evolving the population of circuits over time.
+
+The 4-bit nibble is the atomic gate, the router, and the identity of the computational universe all at once. That triple role is the deepest thing in the whole design. Everything else — lane groupings, horizontal ops, circuit macros, evolutionary updates, hybrid continuous interfaces — is in service of making that triple role scale into a genuine high-dimensional sparse Boolean intelligence substrate.
+
+That is the direction that is actually bleeding-edge. Most of the rest of the ML world is still optimizing the dense real-valued paradigm. This is one of the few coherent attempts to leave it.

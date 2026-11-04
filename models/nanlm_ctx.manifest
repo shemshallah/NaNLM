@@ -1,0 +1,13 @@
+magic NANLMCTX
+version 1
+dim 2048
+words 64
+classes 16
+context 3
+queries 16
+seed 0x4E414E4C4D324100
+data_org 8192
+codebook_words 3072
+position_words 192
+prototype_words 1024
+query_id_words 48

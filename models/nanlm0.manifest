@@ -1,0 +1,12 @@
+magic NANLM0
+version 1
+dim 2048
+words 64
+classes 16
+queries 32
+seed 0x4E414E4C4D300001
+samples_per_class 64
+noise_bits 64
+data_org 8192
+prototype_words 1024
+query_words 2048

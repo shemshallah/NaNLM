@@ -61,7 +61,7 @@ On a 4.5 KB held-out stream, model size dominates the total:
 |---|---:|---:|---:|---:|
 | 3-slot | 3,384,343 | 65,862 | 117.17 | 120.13 |
 | 8-slot | 5,046,578 | 106,626 | 189.89 | 193.66 |
-| mixer table 14 | 6,242,400 | — | — | 11,121.09 |
+| mixer table 14 | 6,258,784 | — | — | 11,150.27 |
 
 This is not a reason to hide model size. It is the reason to:
 

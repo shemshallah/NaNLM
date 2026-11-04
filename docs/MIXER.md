@@ -44,7 +44,7 @@ Alice, 4,492 held-out bytes, table bits 14:
 | 3-gram baseline | 48.13% | 3.4203 |
 | 3-slot typed memory | **49.05%** | **2.9593** |
 
-The static mixer loses. Its model is 6.24 MB, so it is not Pareto either.
+The static mixer loses. Its model is 6.26 MB, so it is not Pareto either.
 
 ## Why the first mixer lost
 

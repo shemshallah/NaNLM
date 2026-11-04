@@ -104,6 +104,21 @@ or a better corpus, not a larger student.
 - If `bitsandbytes` fails, run with `--no-4bit` only on a GPU with enough
   memory; otherwise use a smaller Apache teacher.
 
+## Cheap scale/size grid
+
+After the hybrid exists, tune it without loading Qwen:
+
+```python
+import subprocess, sys
+subprocess.run(["git", "-C", "/kaggle/working/NaNLM", "pull", "--ff-only"],
+               check=True)
+subprocess.run([sys.executable,
+                "/kaggle/working/NaNLM/kaggle_grid.py"], check=True)
+```
+
+It tests teacher scales `0,4,8,16,32,64` and 8-slot sizes `2048,4096`, then
+writes `/kaggle/working/kaggle_grid.log`. Scale `0` is the n-gram-only control.
+
 ## If you already ran the pure teacher
 
 A pure Qwen teacher only emits at token boundaries. If the pure student is

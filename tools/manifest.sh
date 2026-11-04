@@ -27,7 +27,7 @@ for f in \
     models/qwen_0.5b/card.json models/qwen_0.5b/qwen_slot8.manifest \
     models/qwen_0.5b/qwen_hybrid_slot8.manifest \
     models/qwen_0.5b/qwen_hybrid_slot3.manifest \
-    modal_teacher.py tools/hf_teacher.py kaggle_qwen7b.py kaggle_hybrid.py \
+    modal_teacher.py tools/hf_teacher.py kaggle_qwen7b.py kaggle_hybrid.py kaggle_grid.py \
     docs/GPU.md docs/AMD_GPU.md docs/MODAL.md docs/KAGGLE.md \
     notebooks/qwen7b_teacher.ipynb
 do

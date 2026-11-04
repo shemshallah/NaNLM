@@ -4,7 +4,7 @@ LDFLAGS ?=
 
 BUILD := build
 
-.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check slot8-check shard-check shard2-check mixer-check eval-check pack-check plasticity-check shard-slot-check teacher-check teacher-slot-check continuous-check regime-check layers-check lut-check lane-check manifest
+.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check slot8-check shard-check shard2-check mixer-check eval-check pack-check plasticity-check sparse-check token-hdc-check shard-slot-check teacher-check teacher-slot-check continuous-check regime-check layers-check lut-check lane-check manifest
 
 all: test
 
@@ -141,6 +141,13 @@ pack-check:
 
 plasticity-check: $(BUILD)/nanlm_asm $(BUILD)/nanlm_vm
 	sh tools/build_plasticity.sh
+
+sparse-check:
+	python3 experiments/sparse_dim.py --classes 64 --noise 0.03 --samples 16
+
+token-hdc-check:
+	python3 experiments/token_hdc.py --max-vocab 1024 --dim 2048 --mode fixed
+	python3 experiments/token_hdc.py --max-vocab 1024 --dim 2048 --mode regime
 
 shard-slot-check: $(BUILD)/nanlm_shard_slot
 	sh tools/build_shard_slot.sh

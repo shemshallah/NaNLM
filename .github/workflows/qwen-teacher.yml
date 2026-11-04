@@ -1,0 +1,101 @@
+name: qwen-teacher
+
+on:
+  workflow_dispatch:
+    inputs:
+      corpus:
+        description: "Corpus file to teacher"
+        required: true
+        default: "data/alice_excerpt.txt"
+      max_samples:
+        description: "Token boundaries to query"
+        required: true
+        default: "256"
+      top_k:
+        description: "Teacher top-k tokens"
+        required: true
+        default: "8"
+
+permissions:
+  contents: read
+
+jobs:
+  teacher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build llama.cpp server
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
+          cmake -S llama.cpp -B llama.cpp/build \
+            -DGGML_NATIVE=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build llama.cpp/build --config Release -j2 --target llama-server
+
+      - name: Fetch Qwen 0.5B teacher (Apache-2.0)
+        run: |
+          mkdir -p models
+          curl -L --retry 3 -o models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
+            https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf
+
+      - name: Start llama-server
+        run: |
+          mkdir -p build
+          nohup llama.cpp/build/bin/llama-server \
+            -m models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
+            -c 4096 --host 127.0.0.1 --port 8080 \
+            > build/server.log 2>&1 &
+          echo $! > build/server.pid
+          for i in $(seq 1 180); do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+              echo "server ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "server failed to start" >&2
+          cat build/server.log >&2
+          exit 1
+
+      - name: Emit Qwen teacher shard
+        run: |
+          python3 tools/qwen_teacher.py \
+            --server http://127.0.0.1:8080 \
+            --corpus "${{ inputs.corpus }}" \
+            --out build/qwen_teacher.ntr \
+            --top-k "${{ inputs.top_k }}" \
+            --max-samples "${{ inputs.max_samples }}"
+
+      - name: Compile 8-slot student
+        run: |
+          make build/nanlm_teacher build/nanlm_slot8_train build/nanlm_asm build/nanlm_vm
+          ./build/nanlm_teacher stats build/qwen_teacher.ntr
+          ./build/nanlm_slot8_train \
+            --teacher build/qwen_teacher.ntr \
+            --corpus "${{ inputs.corpus }}" \
+            --max-keys 2048 \
+            --out build/qwen_slot8.nas \
+            --expected build/qwen_slot8.expected \
+            --manifest build/qwen_slot8.manifest
+          ./build/nanlm_asm build/qwen_slot8.nas build/qwen_slot8.nan
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f build/server.pid ]; then kill "$(cat build/server.pid)" || true; fi
+          cat build/server.log || true
+
+      - name: Upload teacher and student artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen-teacher-slot8
+          path: |
+            build/qwen_teacher.ntr
+            build/qwen_slot8.nas
+            build/qwen_slot8.expected
+            build/qwen_slot8.manifest
+            build/qwen_slot8.nan
+            build/server.log
+          if-no-files-found: warn

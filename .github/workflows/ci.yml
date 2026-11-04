@@ -32,6 +32,8 @@ jobs:
         run: make shard-slot-check
       - name: continuous code pipeline gate
         run: make continuous-check
+      - name: 8-byte / 16-slot student gate
+        run: make slot8-check
       - name: teacher shard gate
         run: make teacher-check
       - name: teacher -> slot gate

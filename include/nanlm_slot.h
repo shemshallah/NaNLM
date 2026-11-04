@@ -17,14 +17,26 @@
 extern "C" {
 #endif
 
-#define NANLM_CTX_BYTES 3u
-#define NANLM_SLOT_N 6u              /* 3 byte slots + 3 ctype slots */
+#ifndef NANLM_SLOT_CTX_BYTES
+#define NANLM_SLOT_CTX_BYTES 3u
+#endif
+#ifndef NANLM_SLOT_N
+#define NANLM_SLOT_N (2u * NANLM_SLOT_CTX_BYTES)
+#endif
 #define NANLM_SLOT_CW 8u
-#define NANLM_SLOT_VW (NANLM_SLOT_N * NANLM_SLOT_CW) /* 48 words */
+#define NANLM_SLOT_VW (NANLM_SLOT_N * NANLM_SLOT_CW)
 #define NANLM_SLOT_BITS (NANLM_SLOT_N * 256u)
 
+#if NANLM_SLOT_CTX_BYTES == 3
+typedef uint32_t nanlm_slot_key;
+#elif NANLM_SLOT_CTX_BYTES == 8
+typedef uint64_t nanlm_slot_key;
+#else
+#error "slot context must be 3 or 8 bytes"
+#endif
+
 typedef struct {
-    uint32_t key;   /* 3-byte context */
+    nanlm_slot_key key;   /* packed context bytes, oldest byte high */
     uint8_t next;
     uint16_t weight;
 } nanlm_slot_count;
@@ -57,9 +69,11 @@ nanlm_slot_model *nanlm_slot_build_counts(const nanlm_slot_count *counts,
                                           uint32_t nqueries);
 void nanlm_slot_free(nanlm_slot_model *m);
 
-int nanlm_slot_encode(const nanlm_slot_model *m, const uint8_t ctx[3],
+int nanlm_slot_encode(const nanlm_slot_model *m,
+                      const uint8_t ctx[NANLM_SLOT_CTX_BYTES],
                       uint32_t out[NANLM_SLOT_VW]);
-int nanlm_slot_predict(const nanlm_slot_model *m, const uint8_t ctx[3],
+int nanlm_slot_predict(const nanlm_slot_model *m,
+                       const uint8_t ctx[NANLM_SLOT_CTX_BYTES],
                        uint8_t *out_next);
 uint32_t nanlm_slot_hash(const uint32_t key[NANLM_SLOT_VW]);
 

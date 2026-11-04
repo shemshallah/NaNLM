@@ -186,3 +186,28 @@ The next command is:
 and then 512. The question is whether the 2.29 BPC signal survives at a model
 size small enough to be Pareto. If it does not, the teacher table is too
 specific for this corpus size; more data — not more dimensions — is the answer.
+
+## Pruning result: no Pareto region
+
+| prototypes | stream BPC | sparse model | sparse + ngram total |
+|---:|---:|---:|---:|
+| 5,790 | 2.2928 | 640,536 B | 1399.02 BPC |
+| 1,024 | 2.4664 | 67,466 B | 374.99 BPC |
+| 512 | 2.4656 | 35,801 B | 318.40 BPC |
+
+Pruning destroys teacher coverage:
+
+- 1,024: exact3 3.48%, exact123 64.32%;
+- 512: exact3 3.30%, exact123 54.59%;
+- teacher backoff BPC rises to 4.29–4.44;
+- HDC+doc settles at ~2.466 and is essentially the n-gram fallback.
+
+The 4.5 KB stream is also too small for model-size comparison. To beat 2.9593
+BPC, the model budget is roughly 300 bytes; no useful token table fits. A 36 KB
+model alone is ~64 BPC equivalent on this stream.
+
+This is a **negative result for compact token HDC on a tiny stream**. It does
+not say token HDC is dead; it says the evaluation stream must be large enough to
+amortize a model, or the model must be hundreds of bytes, not tens of KB.
+
+Next evaluation needs a 1 MB+ held-out stream (PG-19/Gutenberg/code), not 4.5 KB.

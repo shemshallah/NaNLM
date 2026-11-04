@@ -218,7 +218,7 @@ The model is a structural base, not a quality claim.
 - HDC bits/byte is not calibrated; only the n-gram BPC is reported.
 - The 8,192-bit byte model has not been trained or run.
 - The seal/loader path does not exist yet.
-- CI has not run on x86-64 yet (the next push will test it).
+- CI runs the full gates on x86-64 and the local gates run on aarch64.
 - The runtime template is still embedded in C, not a standalone `.nas` file.
 
 The next gate is M2: context binding and bundling in the NaN16 runtime, then a

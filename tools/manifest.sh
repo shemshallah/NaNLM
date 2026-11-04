@@ -29,7 +29,7 @@ for f in \
     models/qwen_0.5b/qwen_hybrid_slot3.manifest \
     modal_teacher.py tools/hf_teacher.py kaggle_qwen7b.py kaggle_hybrid.py kaggle_grid.py kaggle_token.py \
     docs/GPU.md docs/AMD_GPU.md docs/MODAL.md docs/KAGGLE.md docs/QWEN7B.md \
-    docs/TOKEN.md tools/hf_token_teacher.py tools/token_shard.py \
+    docs/TOKEN.md tools/hf_token_teacher.py tools/token_shard.py tools/token_student.py \
     notebooks/qwen7b_teacher.ipynb
 do
     if [ -f "$f" ]; then

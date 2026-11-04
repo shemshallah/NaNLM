@@ -202,7 +202,7 @@ The tests verify the parts that must not drift:
 - [Packing and fast kernels](docs/PACKING.md) — bit-plane pages, VM conformance, additive HDC counters, and the T1/T2/T3 split.
 - [Qwen teacher runner](docs/QWEN.md) — the first real Qwen run, its teacher card, and why 0.5B/256 samples is not enough.
 - [Qwen 7B teacher result](docs/QWEN7B.md) — the T4 teacher card, the scale grid, and why the byte student cannot consume it.
-- [Token-level teacher/student](docs/TOKEN.md) — exact token-ID shards, merge/scale tools, and the token-student design.
+- [Token-level teacher/student](docs/TOKEN.md) — exact token-ID shards, merge/scale tools, token backoff evaluation, and the token-student design.
 - [Free-GPU strategy](docs/GPU.md) — Modal batch teacher inference, free-tier options, and what not to spend GPU hours on.
 - [Kaggle runbook](docs/KAGGLE.md) — one script for a free T4/GPU session, with teacher, hybrid backoff, and student artifacts.
 - `kaggle_hybrid.py` — rebuild hybrid students from an existing 7B teacher shard without reloading the model.

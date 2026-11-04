@@ -93,6 +93,24 @@ The token card reports:
 **Gate:** teacher BPC must beat token-ngram BPC. If it does not, do not build a
 student.
 
+## Token student/backoff evaluation
+
+With the NTT shard, run the CPU-only token student bridge:
+
+```python
+!python /kaggle/working/NaNLM/tools/token_student.py   --ntt /kaggle/working/qwen7b_tokens.ntt   --corpus /kaggle/working/NaNLM/data/alice_excerpt.txt   --model Qwen/Qwen2.5-7B-Instruct
+```
+
+It reports:
+
+- `teacher_exact`: teacher shard on exact 3-token contexts;
+- `token_ngram`: token 3/2/1 + unigram backoff;
+- `teacher_plus_backoff`: teacher when exact, n-gram otherwise.
+
+This is the decision gate for compiling a token student. If
+`teacher_plus_backoff` does not beat `token_ngram`, the next problem is the
+teacher shard or the tokenization, not the `.nas` compiler.
+
 ## Merge and scale
 
 ```sh

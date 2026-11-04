@@ -21,23 +21,24 @@ Script: `experiments/regime_vs_fixed.py`.
 
 ## Results
 
-| task | fixed | learned router | random router |
-|---|---:|---:|---:|
-| parity4 | 100.00% ± 0.00 | 100.00% ± 0.00 | 100.00% ± 0.00 |
-| majority4 | 86.23% ± 1.03 | **92.77% ± 1.28** | 88.96% ± 5.07 |
-| mixed parity/majority | 84.28% ± 7.14 | 87.99% ± 4.81 | 84.08% ± 4.99 |
-| teacher piecewise 3-gate trees | 98.34% ± 4.39 | **100.00% ± 0.00** | 98.14% ± 4.91 |
-| random labels (control) | 48.54% ± 3.63 | 49.71% ± 4.72 | 48.93% ± 3.54 |
+| task | fixed3 (3 gates) | fixed6 (6 gates) | routed3 (3 gates) | random router |
+|---|---:|---:|---:|---:|
+| parity4 | 100.00% ± 0.00 | 100.00% ± 0.00 | 100.00% ± 0.00 | 100.00% ± 0.00 |
+| majority4 | 86.23% ± 1.03 | 100.00% ± 0.00 | **92.77% ± 1.28** | 88.96% ± 5.07 |
+| mixed parity/majority | 84.28% ± 7.14 | 90.92% ± 3.51 | 87.99% ± 4.81 | 84.08% ± 4.99 |
+| teacher piecewise | 98.34% ± 4.39 | 98.93% ± 2.84 | **100.00% ± 0.00** | 98.14% ± 4.91 |
+| random labels (control) | 48.54% ± 3.63 | 48.44% ± 4.21 | 49.71% ± 4.72 | 48.93% ± 3.54 |
 
 ## What this says
 
-- On **majority4**, learned routing beats fixed by **+6.5 points** at the same
-  inference gate count.
-- On a **teacher piecewise** task, learned routing reaches **100%** vs 98.3%.
-- A **random router** gets less of the gain (88.96 on majority, 98.14 on
-  teacher), so the gain is not only extra parameters.
+- On **majority4**, learned routing beats the equal-inference fixed3 by
+  **+6.5 points**.
+- A **6-gate fixed tree** reaches 100% on majority, so the routed gain is an
+  **efficiency win**, not a raw-capacity win: 3 gates versus 6.
+- On **teacher piecewise**, routed3 reaches 100% while fixed3 is 98.3%.
+- A **random router** gets less of the gain, so learned selection matters.
 - On **random labels**, no method wins; the control behaves like chance.
-- Parity is already solved by the fixed tree; routing adds nothing.
+- Parity is already solved by fixed3; routing adds nothing.
 
 This is the first controlled model-level signal that **self-modifying/regime
 selection can help**, not just execute.
@@ -46,7 +47,8 @@ selection can help**, not just execute.
 
 - It is a synthetic 256-input Boolean task, not a language model.
 - The routed model has more parameters (24 vs 12 LUT bits), although the same
-  inference gate count.
+  inference gate count; the fixed6 control shows a dense 6-gate tree can match
+  some gains at twice the inference cost.
 - The majority gain is high-variance across seeds.
 - The mixed task is not significant at this sample size.
 - The 3-gate tree is tiny; scaling is unknown.

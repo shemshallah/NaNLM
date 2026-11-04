@@ -52,6 +52,32 @@ def fit_routed(X, Y, route_bit):
         ns.append(n)
     return ns
 
+def tree6(ns, x):
+    """Two 3-gate subtrees combined by a 7th gate: same two-tree family as
+    routed, but executed densely instead of conditionally."""
+    n1, n2, n3, n4, n5, n6, n7 = ns
+    a = tree(n1, n2, n3, x)
+    b = tree(n4, n5, n6, x)
+    return gate(n7, a, b)
+
+def fit_fixed6(X, Y, seed=0):
+    """Exact search over one optimal subtree + a second subtree + combiner."""
+    (void_seed := seed)
+    _, sub1 = fit_fixed(X, Y)
+    a = tree(*sub1, X)
+    best = (-1.0, sub1 + sub1 + (12,))
+    for n4 in range(16):
+        g4 = gate(n4, X & 1, (X >> 1) & 1)
+        for n5 in range(16):
+            g5 = gate(n5, (X >> 2) & 1, (X >> 3) & 1)
+            for n6 in range(16):
+                b = gate(n6, g4, g5)
+                for n7 in range(16):
+                    acc = (gate(n7, a, b) == Y).mean()
+                    if acc > best[0]:
+                        best = (acc, sub1 + (n4, n5, n6, n7))
+    return best
+
 def pred_routed(ns, X, route_bit):
     r = (X >> route_bit) & 1
     out = np.zeros(len(X), dtype=np.uint8)
@@ -99,7 +125,7 @@ def run(seeds=8, n_train=128):
     X = np.arange(256, dtype=np.uint32)
     print(f"train={n_train} test={256-n_train} seeds={seeds} gates=3")
     for name, fn in TASKS:
-        fixed_accs = []; routed_accs = []; random_router_accs = []; router_hits = []
+        fixed_accs = []; fixed6_accs = []; routed_accs = []; random_router_accs = []; router_hits = []
         for seed in range(seeds):
             rng = np.random.default_rng(seed)
             perm = rng.permutation(256)
@@ -114,6 +140,8 @@ def run(seeds=8, n_train=128):
             # fixed uses exactly the same fit subset, never val/test
             _, nf = fit_fixed(X[fit], Y[fit])
             fixed_accs.append((tree(*nf, X[te]) == Y[te]).mean())
+            _, n6 = fit_fixed6(X[fit], Y[fit], seed)
+            fixed6_accs.append((tree6(n6, X[te]) == Y[te]).mean())
             best = (-1, 0, None)
             for rb in range(4):
                 ns = fit_routed(X[fit], Y[fit], rb)
@@ -128,8 +156,10 @@ def run(seeds=8, n_train=128):
             random_router_accs.append((pred_routed(nsr, X[te], rr) == Y[te]).mean())
         p = len(TASKS)
         def fmt(a): return f"{100*np.mean(a):6.2f}%±{100*np.std(a):4.2f}"
-        print(f"{name:38s} fixed={fmt(fixed_accs)} routed={fmt(routed_accs)} "
-              f"random-router={fmt(random_router_accs)} routers={router_hits}")
+        d = np.array(routed_accs) - np.array(fixed_accs)
+        print(f"{name:38s} fixed3={fmt(fixed_accs)} fixed6={fmt(fixed6_accs)} "
+              f"routed3={fmt(routed_accs)} random-router={fmt(random_router_accs)} "
+              f"diff={100*d.mean():+5.2f}±{100*d.std()/np.sqrt(len(d)):4.2f} routers={router_hits}")
 
 if __name__ == "__main__":
     run()

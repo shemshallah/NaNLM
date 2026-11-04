@@ -4,7 +4,7 @@ LDFLAGS ?=
 
 BUILD := build
 
-.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check shard-check teacher-check regime-check lane-check manifest
+.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check shard-check teacher-check regime-check layers-check lane-check manifest
 
 all: test
 
@@ -55,6 +55,12 @@ test: $(BUILD)/test_word $(BUILD)/test_vec $(BUILD)/test_model $(BUILD)/test_ctx
 
 model: $(BUILD)/nanlm_train
 	./$(BUILD)/nanlm_train --out models/nanlm0.nas --expected models/nanlm0.expected --manifest models/nanlm0.manifest
+
+layers-check: $(BUILD)/nanlm_asm $(BUILD)/nanlm_vm
+	./$(BUILD)/nanlm_asm tests/layers.nas $(BUILD)/layers.nan
+	./$(BUILD)/nanlm_vm --img $(BUILD)/layers.nan --steps 100000 > $(BUILD)/layers.out 2> $(BUILD)/layers.err
+	grep -q "rc=3, .*trap=''" $(BUILD)/layers.err
+	grep -qx PASS $(BUILD)/layers.out
 
 regime-check: $(BUILD)/nanlm_asm $(BUILD)/nanlm_vm
 	./$(BUILD)/nanlm_asm tests/regime.nas $(BUILD)/regime.nan

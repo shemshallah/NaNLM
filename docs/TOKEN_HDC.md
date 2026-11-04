@@ -16,15 +16,18 @@
 
 Alice, 12,497 tokens, 5,571 prototypes, 1,874 held-out tokens / 4,550 bytes:
 
-| mode | dim | top-1 | BPT | BPC |
-|---|---:|---:|---:|---:|
-| fixed XOR | 2,048 | 39.49% | 7.7698 | 3.2001 |
-| regime-selected `n` | 2,048 | 39.81% | 7.7474 | 3.1909 |
-| regime-selected `n` | 8,192 | 39.86% | 7.7181 | 3.1788 |
+| mode | dim | top-1 | BPT | BPC | active % |
+|---|---:|---:|---:|---:|---:|
+| fixed XOR, dense position codes | 2,048 | 39.49% | 7.7698 | 3.2001 | 49.5 |
+| regime-selected `n`, dense position codes | 2,048 | 39.81% | 7.7474 | 3.1909 | 49.6 |
+| fixed XOR, sparse position codes | 2,048 | 37.46% | 7.8342 | 3.2267 | 2.88 |
+| regime-selected `n`, sparse position codes | 2,048 | 38.69% | 7.7301 | 3.1838 | 9.85 |
+| regime-selected `n`, sparse position codes | 8,192 | 39.27% | 7.7008 | 3.1717 | 9.91 |
 
-Regime specialization gives a small positive shift: **+0.32 points / −0.009 BPC**
-at 2,048 bits. That is not enough to claim the dual-use `n` is paying for
-itself yet.
+Regime specialization gives a small positive shift at fixed dimension:
+**+1.23 points / −0.043 BPC** with sparse position codes, but it raises active
+fraction from 2.88% to 9.85%. That is not enough to claim the dual-use `n` is
+paying for itself yet.
 
 The token HDC prototype does **not** beat the byte 3-slot model
 (**2.9593 BPC**). It is a research prototype, not a replacement.
@@ -32,12 +35,13 @@ The token HDC prototype does **not** beat the byte 3-slot model
 ## Model size and sparsity
 
 At 2,048 bits, 5,571 prototypes means 11.4 million model bits. At 8,192 bits it
-is 45.6 million bits. The active fraction of prototypes is ~50% because binding
-a sparse token code to a dense position code densifies the representation.
+is 45.6 million bits. Sparse position codes reduce active prototype bits from
+~50% to 3–10%, but they also cost accuracy. Higher dimension gives only a tiny
+BPC improvement at 4x the model bits.
 
-This is the key next problem: **sparse token codes are becoming dense after
-binding/bundling**. The 8k-bit model does not help unless the encoded vectors
-stay cold.
+This is the key next problem: **sparse representation is not yet paying for
+itself**. The next step is not more bits; it is teacher-guided token counts,
+learned regime selection, and recency-graded slots.
 
 ## What this prototype says
 

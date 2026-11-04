@@ -56,7 +56,7 @@ def pack_matrix(bits: np.ndarray) -> np.ndarray:
 
 
 def run(mode: str, dim: int, density: float, max_vocab: int, top_k: int,
-        seed: int) -> None:
+        seed: int, pos_density: float = 0.05) -> None:
     rng = np.random.default_rng(seed)
     text = Path("data/alice_excerpt.txt").read_text(encoding="utf-8")
     raw = TOKEN_RE.findall(text)
@@ -73,7 +73,7 @@ def run(mode: str, dim: int, density: float, max_vocab: int, top_k: int,
 
     # Sparse random token codes and dense position codes.
     codes = (rng.random((len(vocab), dim)) < density)
-    pos = (rng.random((3, dim)) < 0.5)
+    pos = (rng.random((3, dim)) < pos_density)
     # Repaired per-class truth tables. 6 = XOR; 9/12/15 add mixing.
     n_by_class = {0: 6, 1: 6, 2: 12, 3: 9} if mode == "regime" else {
         0: 6, 1: 6, 2: 6, 3: 6
@@ -139,9 +139,10 @@ def main() -> int:
     p.add_argument("--max-vocab", type=int, default=4096)
     p.add_argument("--top-k", type=int, default=8)
     p.add_argument("--seed", type=int, default=1234)
+    p.add_argument("--pos-density", type=float, default=0.05)
     args = p.parse_args()
     run(args.mode, args.dim, args.density, args.max_vocab, args.top_k,
-        args.seed)
+        args.seed, args.pos_density)
     return 0
 
 

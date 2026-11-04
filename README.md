@@ -204,7 +204,7 @@ The tests verify the parts that must not drift:
 - [Qwen 7B teacher result](docs/QWEN7B.md) — the T4 teacher card, the scale grid, and why the byte student cannot consume it.
 - [Token-level teacher/student](docs/TOKEN.md) — exact token-ID shards, merge/scale tools, token backoff evaluation, and the token-student design.
 - [In-VM plasticity](docs/PLASTICITY.md) — bit-sliced counters and STW truth-table search inside `nanlm_vm`.
-- [Token HDC prototype](docs/TOKEN_HDC.md) — first token-level HDC student and the regime-specialization result.
+- [Token HDC prototype](docs/TOKEN_HDC.md) — first token-level HDC student, sparse-position result, and the regime-specialization result.
 - [Sparse high-dimensional sweep](docs/SPARSE.md) — dimensions, active fraction, and noise fragility.
 - [Free-GPU strategy](docs/GPU.md) — Modal batch teacher inference, free-tier options, and what not to spend GPU hours on.
 - [Kaggle runbook](docs/KAGGLE.md) — one script for a free T4/GPU session, with teacher, hybrid backoff, and student artifacts.

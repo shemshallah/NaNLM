@@ -1,5 +1,9 @@
 # NaNLM
 
+[![ci](https://github.com/shemshallah/NaNLM/actions/workflows/ci.yml/badge.svg)](https://github.com/shemshallah/NaNLM/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![word](https://img.shields.io/badge/word-NaN16-7ff8.svg)](docs/VM.md)
+
 **A high-dimensional Boolean model that lives in NaN16 words.**
 
 NaNLM is a standalone project. It uses the NaN16 word format studied from

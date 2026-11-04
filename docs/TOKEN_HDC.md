@@ -171,6 +171,9 @@ With the causal document cache carried into the HDC evaluator:
 
 The HDC path closes part of the gap (2.518 → 2.29) but remains worse than the
 teacher lookup. It also remains much larger than a 4.5 KB stream can amortize.
+Fixed mode is best on stream quality (2.2928 BPC, 12.93% top-1); regime is
+smaller (362 KB vs 641 KB) but slightly worse (2.3020 BPC, 11.51% top-1).
+Neither is Pareto.
 
 The HDC top-1 now includes the document cache in its argmax; the BPC table above
 is the current reference.

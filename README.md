@@ -146,6 +146,8 @@ The tests verify the parts that must not drift:
 - [Foundations](docs/FOUNDATIONS.md) — the full design argument.
 - [Keystone and supports](docs/KEYSTONE.md) — the stable core and the replaceable model parts.
 - [Distributed training](docs/DISTRIBUTED.md) — reporam/repovram shards, volunteers, and the S3 path.
+- [Repo-anchored brains](docs/REPO_BRAIN.md) — identity vs residence, manifests, and mirrors.
+- [Smart base / teacher distillation](docs/TEACHER.md) — how to get a smart model immediately.
 - [Model 0](docs/MODEL_0.md) — a concrete, buildable first model.
 - [M2 plan](docs/M2_PLAN.md) — context binding, a real corpus, and negative gates.
 - [C adapter](docs/ADAPTER.md) — the S6 boundary and the `.nan` compiler.

@@ -4,7 +4,7 @@ LDFLAGS ?=
 
 BUILD := build
 
-.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check shard-check lane-check
+.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check shard-check lane-check manifest
 
 all: test
 
@@ -82,6 +82,9 @@ model-slot-check: $(BUILD)/nanlm_slot_train
 
 shard-check: $(BUILD)/nanlm_shard
 	sh tools/build_shard.sh
+
+manifest:
+	sh tools/manifest.sh
 
 clean:
 	rm -rf $(BUILD) models/nanlm0.nas models/nanlm0.nan models/nanlm0.expected models/nanlm0.manifest models/nanlm_ctx.nas models/nanlm_ctx.nan models/nanlm_ctx.expected models/nanlm_ctx.manifest models/nanlm_lm.nas models/nanlm_lm.nan models/nanlm_lm.expected models/nanlm_lm.manifest models/nanlm_slot.nas models/nanlm_slot.nan models/nanlm_slot.expected models/nanlm_slot.manifest

@@ -1,7 +1,8 @@
 # Corpus provenance
 
 `alice_excerpt.txt` is the first 30,000 bytes of *Alice's Adventures in
-Wonderland* by Lewis Carroll, Project Gutenberg eBook #11.
+Wonderland* by Lewis Carroll, Project Gutenberg eBook #11. `alice_full.txt` is
+the full 151,191-byte text.
 
 - Source: https://www.gutenberg.org/files/11/11-0.txt
 - Status: public domain in the United States.

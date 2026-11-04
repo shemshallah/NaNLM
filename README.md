@@ -33,7 +33,7 @@ experiment with a measurable baseline.
 
 **Status:** M1, M2a, M2b, and the M3 simplex slot memory pass. The NaN16
 runtime runs the byte-level class memory (26.6% top-1 / 5.50 BPC) and the new
-slot memory (**51.6% top-1 / 2.72 BPC** vs the in-repo interpolated n-gram
+slot memory (**52.3% top-1 / 2.67 BPC** vs the in-repo interpolated n-gram
 **55.5% / 3.13 BPC** on 128 held-out contexts). The slot memory wins
 bits-per-byte and loses top-1 on this small corpus; the distributed plan is
 how it scales.

@@ -213,8 +213,8 @@ sh tools/build_slot.sh
 Output:
 
 ```
-nanlm-slot: keys=3832 bits=765 queries=32
-eval_n=128 hdc_top1=51.56% hdc_bpc=2.7196
+nanlm-slot: keys=3832 bits=1536 queries=32
+eval_n=128 hdc_top1=52.34% hdc_bpc=2.6703
 ngram_top1=55.47% ngram_bpc=3.1304
 build_slot: PASS (32 queries)
 build_slot: NEGATIVE PASS (step starvation rejected)
@@ -223,12 +223,12 @@ build_slot: NEGATIVE PASS (step starvation rejected)
 The NaNLM VM trace:
 
 ```
-[nanlm-vm] nan-text: 100695708 steps, rc=3, pc=39, trap=''
+[nanlm-vm] nan-text: 197829777 steps, rc=3, pc=39, trap=''
 ```
 
 This is one prototype per observed 3-gram, with 255-bit simplex codewords in
 three slots. The runtime matches the C predictions and query hashes exactly.
-It wins bits-per-byte (2.72 vs 3.13) and loses top-1 (51.6% vs 55.5%) to the
+It wins bits-per-byte (2.67 vs 3.13) and loses top-1 (52.3% vs 55.5%) to the
 in-repo interpolated n-gram. Honest, not hidden.
 
 ## 8. Additive shard merge
@@ -259,8 +259,8 @@ the CRDT property that lets volunteers train without coordination.
 ## What is not proven yet
 
 - The class memory (M2b) loses to the n-gram: 26.6% / 5.50 BPC vs 50.0% / 3.85.
-- The slot memory (M3) wins bits-per-byte (2.72 vs 3.13) but loses top-1
-  (51.6% vs 55.5%) on the 128-context Alice split.
+- The slot memory (M3) wins bits-per-byte (2.67 vs 3.13) but loses top-1
+  (52.3% vs 55.5%) on the 128-context Alice split.
 - The slot model is built from a corpus, not yet compiled directly from merged
   shards.
 - reporam/repovram page mapping and generation manifests are designed but not

@@ -168,7 +168,7 @@ host adapter, then emit the layer as NaN16 words and gate the compiled model.
 - `make layers-check` passes: scalar add, Boolean complement, byte mask, and
   byte OR on the same payload.
 - `make regime-check` passes: self-modifying truth table.
-- The slot memory is 51.6% top-1 / 2.72 BPC vs the n-gram 55.5% / 3.13.
+- The slot memory is 52.3% top-1 / 2.67 BPC vs the n-gram 55.5% / 3.13.
 
 Next: a **Regime vs fixed** classifier and a **heterogeneous B → V → M** stack.
 Those two tests decide whether the layer idea is a real architecture or only a

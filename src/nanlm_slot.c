@@ -7,7 +7,7 @@
 
 #include "nan16_word.h"
 
-static uint32_t codebook[256 * NANLM_SLOT_CW];
+static uint32_t codebook[NANLM_SLOT_N * 256 * NANLM_SLOT_CW];
 static int codebook_ready = 0;
 
 static unsigned parity8(unsigned x) {
@@ -17,15 +17,44 @@ static unsigned parity8(unsigned x) {
     return x & 1u;
 }
 
+static uint32_t ctype8(uint32_t b) {
+    int is_space = (b == 32 || b == 10 || b == 13 || b == 9);
+    int is_alpha = ((b >= 65 && b <= 90) || (b >= 97 && b <= 122));
+    int is_upper = (b >= 65 && b <= 90);
+    int is_digit = (b >= 48 && b <= 57);
+    int lower = is_upper ? (int)b + 32 : (int)b;
+    int is_vowel = (lower == 'a' || lower == 'e' || lower == 'i' ||
+                    lower == 'o' || lower == 'u');
+    int is_punct = (b >= 33 && b <= 126 && !is_alpha && !is_digit);
+    return (uint32_t)is_space | ((uint32_t)is_alpha << 1) |
+           ((uint32_t)is_upper << 2) | ((uint32_t)is_digit << 3) |
+           ((uint32_t)is_vowel << 4) | ((uint32_t)is_punct << 5) |
+           ((b & 1u) << 6) | (((b >> 1) & 1u) << 7);
+}
+
 static void make_codebook(void) {
-    uint32_t i, j;
+    uint32_t i, j, block, bit;
     if (codebook_ready) return;
     memset(codebook, 0, sizeof(codebook));
-    for (i = 0; i < 256; i++) {
-        for (j = 1; j < 256; j++) {
-            if (parity8(i & j)) {
-                unsigned bit = j - 1;
-                codebook[i * NANLM_SLOT_CW + bit / 32u] |= 1u << (bit % 32u);
+    for (block = 0; block < 3; block++) {
+        for (i = 0; i < 256; i++) {
+            for (j = 1; j < 256; j++) {
+                if (parity8(i & j)) {
+                    bit = j - 1;
+                    codebook[((block * 256 + i) * NANLM_SLOT_CW) + bit / 32u] |=
+                        1u << (bit % 32u);
+                }
+            }
+        }
+    }
+    for (block = 3; block < NANLM_SLOT_N; block++) {
+        for (i = 0; i < 256; i++) {
+            uint32_t code = ctype8(i);
+            for (j = 0; j < 256; j++) {
+                if ((code >> (j % 8u)) & 1u) {
+                    codebook[((block * 256 + i) * NANLM_SLOT_CW) + j / 32u] |=
+                        1u << (j % 32u);
+                }
             }
         }
     }
@@ -60,9 +89,10 @@ int nanlm_slot_encode(const nanlm_slot_model *m, const uint8_t ctx[3],
     if (!ctx || !out) return -1;
     make_codebook();
     for (i = 0; i < NANLM_SLOT_N; i++) {
+        uint32_t id = ctx[i % NANLM_CTX_BYTES];
         for (w = 0; w < NANLM_SLOT_CW; w++) {
             out[i * NANLM_SLOT_CW + w] =
-                codebook[ctx[i] * NANLM_SLOT_CW + w];
+                codebook[((i * 256 + id) * NANLM_SLOT_CW) + w];
         }
     }
     return 0;
@@ -353,9 +383,12 @@ nanlm_slot_model *nanlm_slot_build(const uint8_t *data, size_t len,
             size_t pos = sample_pos(test_start, val_end, i, nqueries);
             uint8_t ctx[3] = {data[pos - 2], data[pos - 1], data[pos]};
             uint32_t q[NANLM_SLOT_VW];
-            m->qids[i * 3 + 0] = ctx[0];
-            m->qids[i * 3 + 1] = ctx[1];
-            m->qids[i * 3 + 2] = ctx[2];
+            m->qids[i * NANLM_SLOT_N + 0] = ctx[0];
+            m->qids[i * NANLM_SLOT_N + 1] = ctx[1];
+            m->qids[i * NANLM_SLOT_N + 2] = ctx[2];
+            m->qids[i * NANLM_SLOT_N + 3] = ctx[0];
+            m->qids[i * NANLM_SLOT_N + 4] = ctx[1];
+            m->qids[i * NANLM_SLOT_N + 5] = ctx[2];
             nanlm_slot_encode(m, ctx, q);
             nanlm_slot_predict(m, ctx, &m->predicted[i]);
             m->hashes[i] = nanlm_slot_hash(q);
@@ -476,9 +509,12 @@ static const char SLOT_RUNTIME[] =
     "LD r3,r0,@e_ids\n"
     "ADD r3,r3,r1\n"
     "LD r4,r3,0\n"
-    "MOVI r5,#CW\n"
-    "MUL r4,r4,r5\n"
+    "MOVI r9,2048\n"
+    "MUL r9,r1,r9\n"
     "LA r5,@codebook\n"
+    "ADD r5,r5,r9\n"
+    "MOVI r9,#CW\n"
+    "MUL r4,r4,r9\n"
     "ADD r5,r5,r4\n"
     "LD r6,r0,@e_i\n"
     "MOVI r7,#CW\n"
@@ -737,7 +773,7 @@ int nanlm_slot_emit_nas(const nanlm_slot_model *m, const char *path) {
     fprintf(f, ".org 8192\n");
     fprintf(f, "codebook:\n");
     make_codebook();
-    for (i = 0; i < 256 * NANLM_SLOT_CW && ok; i++) {
+    for (i = 0; i < NANLM_SLOT_N * 256 * NANLM_SLOT_CW && ok; i++) {
         if (fprintf(f, ".word 0x%08X\n", codebook[i]) < 0) ok = 0;
     }
     fprintf(f, "prototypes:\n");
@@ -757,7 +793,8 @@ int nanlm_slot_emit_nas(const nanlm_slot_model *m, const char *path) {
     fprintf(f, "query_ids:\n");
     for (i = 0; i < m->nqueries && ok; i++) {
         for (w = 0; w < NANLM_SLOT_N; w++) {
-            if (fprintf(f, ".word 0x%02X\n", m->qids[i * 3 + w]) < 0) ok = 0;
+            if (fprintf(f, ".word 0x%02X\n",
+                        m->qids[i * NANLM_SLOT_N + w]) < 0) ok = 0;
         }
     }
     fprintf(f, "qbuf:\n");

@@ -9,7 +9,7 @@ nearest-key retrieval; majority next byte.
 
 | model | top-1 | BPC |
 |---|---:|---:|
-| slot memory (3832 keys) | 51.6% | **2.72** |
+| slot memory (3832 keys) | 52.3% | **2.67** |
 | in-repo interpolated n-gram | **55.5%** | 3.13 |
 
 The slot memory wins bits-per-byte and loses top-1 on 25 KB of Alice. The

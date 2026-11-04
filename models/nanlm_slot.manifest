@@ -5,12 +5,12 @@ keys 3832
 queries 32
 train_frac 0.850000
 seed 0x4E414E4C534C4F54
-matrix_words 24
-bits 765
+matrix_words 48
+bits 1536
 calib_n 128
 eval_n 128
 alpha 1.000000
-hdc_top1 51.562500
-hdc_bpc 2.719603
+hdc_top1 52.343750
+hdc_bpc 2.670342
 ngram_top1 55.468750
 ngram_bpc 3.130387

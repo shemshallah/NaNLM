@@ -103,7 +103,7 @@ Current small-corpus result (Alice, 128 held-out contexts):
 
 | model | top-1 | bits/byte |
 |---|---:|---:|
-| simplex slot memory | 51.6% | **2.72** |
+| simplex slot memory | 52.3% | **2.67** |
 | in-repo interpolated n-gram | **55.5%** | 3.13 |
 
 The slot memory already wins bits-per-byte. It loses top-1 on 25 KB of text.

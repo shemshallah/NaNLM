@@ -248,7 +248,7 @@ Compare against a homogeneous V stack of the same total word count.
 
 - `make regime-check` — all 16 self-modified truth tables, PASS, 248 steps.
 - `make layers-check` — one payload as scalar, Boolean lanes, byte masks; PASS.
-- `make model-slot-check` — slot memory 51.6% top-1 / 2.72 BPC vs n-gram
+- `make model-slot-check` — slot memory 52.3% top-1 / 2.67 BPC vs n-gram
   55.5% / 3.13; exact runtime diff.
 - `make shard-check`, `make teacher-check` — merge is `A+B == B+A`.
 - Boolean reservoir: 11.15% top-1 / 7.91 BPC — failed, kept as a research note.

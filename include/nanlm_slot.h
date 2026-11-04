@@ -17,10 +17,11 @@
 extern "C" {
 #endif
 
-#define NANLM_SLOT_N 3u
-#define NANLM_SLOT_CW 8u              /* words per 255-bit simplex codeword */
-#define NANLM_SLOT_VW (NANLM_SLOT_N * NANLM_SLOT_CW) /* 24 words */
-#define NANLM_SLOT_BITS (NANLM_SLOT_N * 255u)
+#define NANLM_CTX_BYTES 3u
+#define NANLM_SLOT_N 6u              /* 3 byte slots + 3 ctype slots */
+#define NANLM_SLOT_CW 8u
+#define NANLM_SLOT_VW (NANLM_SLOT_N * NANLM_SLOT_CW) /* 48 words */
+#define NANLM_SLOT_BITS (NANLM_SLOT_N * 256u)
 
 typedef struct {
     uint32_t nkeys;
@@ -31,7 +32,7 @@ typedef struct {
     uint32_t unigram[256];
 
     uint32_t nqueries;
-    uint8_t *qids;     /* nqueries * 3 */
+    uint8_t *qids;     /* nqueries * 6: bytes then ctype bytes */
     uint8_t *predicted;/* nqueries C prediction */
     uint32_t *hashes;  /* nqueries FNV over query key */
 

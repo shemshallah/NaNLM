@@ -174,7 +174,7 @@ Next supports:
 | M1 trainer | `src/nanlm_model.c`, `tools/nanlm_train.c` |
 | M2a context | `src/nanlm_ctx.c`, `tools/nanlm_ctx_train.c` |
 | M2b LM | `src/nanlm_lm.c`, `tools/nanlm_lm_train.c` |
-| M3 slot memory | `src/nanlm_slot.c`, `tools/nanlm_slot_train.c` |
+| M3 slot memory (byte + ctype) | `src/nanlm_slot.c`, `tools/nanlm_slot_train.c` |
 | additive shards | `src/nanlm_shard.c`, `tools/nanlm_shard.c` |
 | runtime template | `src/nanlm_ctx.c` (`nanlm_runtime_source`) |
 | corpus | `data/alice_excerpt.txt` |
@@ -204,7 +204,7 @@ Next supports:
    rejects corruption, and a model card that names the failure modes.
 
 Calibrated HDC decoding is implemented. The slot memory wins bits-per-byte
-(2.72 vs 3.13) but loses top-1 (51.6% vs 55.5%) on Alice. See
+(2.67 vs 3.13) but loses top-1 (52.3% vs 55.5%) on Alice. See
 `docs/DISTRIBUTED.md` for the volunteer/S3 training plan.
 
 Only after those should the project try a router, learned `BOOL.n` circuits, or

@@ -86,8 +86,8 @@ volunteers.
 **Exit gate:** a shard-trained slot model that is compiled, evaluated, and
 published as a generation, with an exact merge gate and a model card.
 
-**Current result:** the slot memory wins bits-per-byte (2.72 vs 3.13) and loses
-top-1 (51.6% vs 55.5%) to the in-repo interpolated n-gram on Alice. Longer
+**Current result:** the slot memory wins bits-per-byte (2.67 vs 3.13) and loses
+top-1 (52.3% vs 55.5%) to the in-repo interpolated n-gram on Alice. Longer
 contexts and teacher distillation are the next quality steps.
 
 ## M4 — Community surface

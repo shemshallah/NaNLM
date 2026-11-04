@@ -95,7 +95,7 @@ and fits the discrete substrate.
 
 - Use a small LUT network to map a 3-byte context to 32 bits.
 - Feed those bits into the slot memory key.
-- Compare to raw slot memory (51.6% / 2.72 BPC).
+- Compare to raw slot memory (52.3% / 2.67 BPC).
 - If LUT features improve top-1/BPC, the special architecture is real.
 
 ### E4 — teacher distillation into LUT features
@@ -131,7 +131,7 @@ If (1) and (2) fail, the layer idea is a taxonomy, not an architecture.
 
 - Self-modifying all 16 regimes: **PASS** (`regime_all.nas`, 248 steps).
 - One payload, four interpretations: **PASS** (`layers.nas`).
-- Slot memory: **51.6% top-1 / 2.72 BPC** vs n-gram **55.5% / 3.13**.
+- Slot memory: **52.3% top-1 / 2.67 BPC** vs n-gram **55.5% / 3.13**.
 - Boolean reservoir: **11.15% / 7.91 BPC** — failed.
 - Regime-vs-fixed synthetic probe: inconclusive; harness bug, not a result.
 

@@ -115,7 +115,7 @@ No step requires owning a cluster.
 
 - Alice corpus, simplex slot memory, 3 slots.
 - `nanlm_asm` / `nanlm_vm`, shard merge, model card.
-- Metrics: 51.6% top-1 / 2.72 BPC vs n-gram 55.5% / 3.13.
+- Metrics: 52.3% top-1 / 2.67 BPC vs n-gram 55.5% / 3.13.
 - Gate: exact shard merge, exact runtime diff, CI green.
 
 What it proves: the format, the merge, and the runtime are real.

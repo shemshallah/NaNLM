@@ -4,7 +4,7 @@ LDFLAGS ?=
 
 BUILD := build
 
-.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check slot8-check shard-check shard2-check mixer-check eval-check pack-check shard-slot-check teacher-check teacher-slot-check continuous-check regime-check layers-check lut-check lane-check manifest
+.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check slot8-check shard-check shard2-check mixer-check eval-check pack-check plasticity-check shard-slot-check teacher-check teacher-slot-check continuous-check regime-check layers-check lut-check lane-check manifest
 
 all: test
 
@@ -138,6 +138,9 @@ eval-check: $(BUILD)/nanlm_slot_train
 
 pack-check:
 	sh tools/build_pack.sh
+
+plasticity-check: $(BUILD)/nanlm_asm $(BUILD)/nanlm_vm
+	sh tools/build_plasticity.sh
 
 shard-slot-check: $(BUILD)/nanlm_shard_slot
 	sh tools/build_shard_slot.sh

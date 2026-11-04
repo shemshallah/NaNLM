@@ -158,3 +158,37 @@ longest-suffix backoff. The same idea applies to token slots.
 - Token student: not implemented yet.
 - Token runtime: not implemented yet.
 - One 7B token pass is the next GPU job, and only if it is cached/cheap.
+
+## Full-corpus 7B teacher results
+
+After running the teacher over all 7,476 Qwen tokens:
+
+| metric | value |
+|---|---:|
+| train tokens | 6,354 |
+| eval tokens | 1,121 |
+| eval bytes | 4,476 |
+| teacher 3-token contexts | 5,790 |
+| teacher 2-token contexts | 4,428 |
+| teacher 1-token contexts | 1,493 |
+| exact 3-token hit rate | 7.3% |
+| any teacher backoff hit | 81.4% |
+| teacher exact top-1 / BPT | 13.41% / 11.5502 |
+| token n-gram top-1 / BPT | 10.70% / 13.1210 |
+| teacher + backoff top-1 / BPT | 11.95% / 9.6472 |
+| teacher + backoff BPC | **2.4161** |
+| token n-gram BPC | 3.2861 |
+
+The BPC number is byte-normalized from the exact decoded token bytes. The
+token top-1 is not comparable to byte top-1 because the vocabulary is 151k.
+
+This is the first token-level BPC result that beats the raw byte 3-slot model
+(2.416 vs 2.959), but it is a **lookup hybrid**, not a compact student:
+
+- it uses the full 91,211-record teacher shard;
+- it uses corpus token n-gram tables;
+- the model-size/Hutter accounting is not yet included;
+- token 3-token exact coverage is only 7.3%.
+
+The next model must compress this lookup into a token HDC/slot memory and pay
+for its own bytes. The 2.416 BPC is a target, not a shipped result.

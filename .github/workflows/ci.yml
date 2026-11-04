@@ -43,6 +43,8 @@ jobs:
         run: make mixer-check
       - name: bit-plane page packer gate
         run: make pack-check
+      - name: in-VM plasticity gate
+        run: make plasticity-check
       - name: 8-byte / 16-slot student gate
         run: make slot8-check
       - name: teacher shard gate

@@ -13,19 +13,24 @@ from pathlib import Path
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--root", default="/kaggle/input")
+    p.add_argument("--root", action="append", default=None,
+                   help="search root (repeatable); defaults to /kaggle/input, "
+                        "/kaggle/inputs, and /kaggle/inputs/datasets")
     p.add_argument("--pattern", default="*.ntt", help="e.g. '*.ntt' or '*.tgz'")
     p.add_argument("--json", action="store_true")
     args = p.parse_args()
-    root = Path(args.root)
-    if not root.exists():
-        print(f"missing {root}; add a Kaggle Dataset in the notebook sidebar")
-        return 1
-    found = sorted(root.rglob(args.pattern))
+    roots = ([Path(x) for x in args.root] if args.root else
+             [Path("/kaggle/input"), Path("/kaggle/inputs"),
+              Path("/kaggle/inputs/datasets")])
+    found = []
+    for root in roots:
+        if root.exists():
+            found.extend(root.rglob(args.pattern))
     if not found:
-        print(f"no {args.pattern} under {root}")
+        print(f"no {args.pattern} under {', '.join(str(r) for r in roots)}")
         print("Kaggle: Add Data -> Your Datasets -> add the token dataset")
         return 1
+    found = sorted(set(found))
     rows = []
     for path in found:
         try:
@@ -33,8 +38,7 @@ def main() -> int:
         except OSError:
             size = -1
         rows.append({"path": str(path), "bytes": size,
-                     "dataset": path.relative_to(root).parts[0]
-                     if len(path.relative_to(root).parts) > 1 else ""})
+                     "dataset": path.parts[-3] if len(path.parts) >= 3 else ""})
     if args.json:
         print(json.dumps(rows, indent=2))
     else:

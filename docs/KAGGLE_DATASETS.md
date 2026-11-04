@@ -39,6 +39,13 @@ Find the exact path:
 !python /kaggle/working/NaNLM/tools/kaggle_find.py --pattern '*.ntt'
 ```
 
+It searches `/kaggle/input`, `/kaggle/inputs`, and
+`/kaggle/inputs/datasets`. For a specific account path:
+
+```python
+!python /kaggle/working/NaNLM/tools/kaggle_find.py --pattern '*.ntt' --root /kaggle/inputs/datasets/shem42
+```
+
 Use it:
 
 ```python

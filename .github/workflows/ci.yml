@@ -14,6 +14,8 @@ jobs:
         run: make test
       - name: VM lane gate
         run: make lane-check
+      - name: self-modifying regime gate
+        run: make regime-check
       - name: M1 model gate
         run: make model-check
       - name: M2a context gate

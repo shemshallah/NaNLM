@@ -201,6 +201,7 @@ int nanlm_vm_run(nanlm_vm *v, uint64_t max_steps) {
         case 0x0F: break;
         case 0x14: mem[(A + imm) & mask] = nan16_bswap(mem[(A + imm) & mask]); break;
         case 0x15: fputc((int)(r[d] & 0xFFu), v->out); break;
+        case 0x16: mem[A & mask] = nan16_make(r[d], B & 15u); break;
         case 0x20:
             res = A * B;
             r[d] = res;

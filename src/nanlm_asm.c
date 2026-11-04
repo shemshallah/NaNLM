@@ -32,7 +32,8 @@ static const Ins INS[] = {
     {"SHR", 0x06, "dai"},   {"CMP", 0x07, "ab"},    {"LD", 0x08, "dai"},
     {"ST", 0x09, "dai"},    {"JMP", 0x0A, "i"},     {"CALL", 0x0B, "i"},
     {"RET", 0x0C, ""},      {"JMPR", 0x0D, "a"},    {"NOP", 0x0F, ""},
-    {"BSWAPM", 0x14, "ai"}, {"PUTC", 0x15, "d"},    {"MUL", 0x20, "dab"},
+    {"BSWAPM", 0x14, "ai"}, {"PUTC", 0x15, "d"},    {"STW", 0x16, "dab"},
+    {"MUL", 0x20, "dab"},
     {"BCOPY", 0x2D, "dab"}, {"BFILL", 0x2E, "dab"}, {"HALT", 0xFF, ""},
 };
 

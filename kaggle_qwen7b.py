@@ -49,6 +49,7 @@ def main() -> int:
     parser.add_argument("--top-k", type=int, default=16)
     parser.add_argument("--chunk", type=int, default=64)
     parser.add_argument("--out-name", default="qwen7b_alice.ntr")
+    parser.add_argument("--teacher-scale", type=int, default=16)
     parser.add_argument("--no-4bit", action="store_true")
     parser.add_argument("--no-compile", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -154,10 +155,13 @@ def main() -> int:
     corpus_size = corpus.stat().st_size
     train_end = int(corpus_size * 0.85)
     ngram = REPO / "build/qwen7b_ngram.ntr"
+    scaled = REPO / "build/qwen7b_teacher_scaled.ntr"
     hybrid = REPO / "build/qwen7b_hybrid.ntr"
     sh(["./build/nanlm_teacher", "build-ngram", str(corpus),
         str(ngram), "0", str(train_end), "4"], cwd=REPO, env=env)
-    sh(["./build/nanlm_teacher", "merge", str(hybrid), str(ngram), str(ntr)],
+    sh(["./build/nanlm_teacher", "scale", str(scaled), str(ntr),
+        "1", str(args.teacher_scale)], cwd=REPO, env=env)
+    sh(["./build/nanlm_teacher", "merge", str(hybrid), str(ngram), str(scaled)],
        cwd=REPO, env=env)
     sh(["./build/nanlm_teacher", "stats", str(ntr)], cwd=REPO, env=env)
     sh(["./build/nanlm_teacher", "stats", str(hybrid)], cwd=REPO, env=env)
@@ -192,7 +196,7 @@ def main() -> int:
         "--boot", "5000"], cwd=REPO, env=env)
 
     print("=== package ===", flush=True)
-    files = [ntr, card, ngram, hybrid, slot8_tsv, slot3_tsv, slot8_nas,
+    files = [ntr, card, ngram, scaled, hybrid, slot8_tsv, slot3_tsv, slot8_nas,
              slot8_exp, slot8_man, slot3_nas, slot3_exp, slot3_man]
     tar = WORK / "qwen7b_run.tgz"
     sh(["tar", "czf", str(tar), "-C", str(REPO)] +

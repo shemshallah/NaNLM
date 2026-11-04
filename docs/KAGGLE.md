@@ -125,6 +125,15 @@ Or, from a shell cell:
 ```
 
 This writes `/kaggle/working/qwen7b_hybrid_run.tgz` and does not load Qwen.
+It scales the Qwen weights by `1/16` by default so the raw n-gram is not
+overridden by 102M teacher weight units, and uses 4,096 8-byte prototypes.
+
+If you want a different blend:
+
+```python
+!python /kaggle/working/NaNLM/kaggle_hybrid.py --teacher-scale 8
+# or --teacher-scale 32
+```
 
 The manual version is:
 
@@ -134,8 +143,10 @@ The manual version is:
   TRAIN_END=$((SIZE * 85 / 100)) && \
   ./build/nanlm_teacher build-ngram data/alice_excerpt.txt \
       build/qwen7b_ngram.ntr 0 $TRAIN_END 4 && \
+  ./build/nanlm_teacher scale build/qwen7b_teacher_scaled.ntr \
+      build/qwen7b_alice.ntr 1 16 && \
   ./build/nanlm_teacher merge build/qwen7b_hybrid.ntr \
-      build/qwen7b_ngram.ntr build/qwen7b_alice.ntr && \
+      build/qwen7b_ngram.ntr build/qwen7b_teacher_scaled.ntr && \
   ./build/nanlm_teacher stats build/qwen7b_hybrid.ntr
 ```
 
@@ -144,7 +155,7 @@ Then compile the hybrid students:
 ```python
 !cd /kaggle/working/NaNLM && \
   ./build/nanlm_slot8_train --teacher build/qwen7b_hybrid.ntr \
-    --corpus data/alice_excerpt.txt --max-keys 2048 \
+    --corpus data/alice_excerpt.txt --max-keys 4096 \
     --eval-log build/qwen7b_hybrid_slot8.tsv \
     --out build/qwen7b_hybrid_slot8.nas \
     --expected build/qwen7b_hybrid_slot8.expected \

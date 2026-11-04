@@ -40,7 +40,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--teacher", default="build/qwen7b_alice.ntr")
     parser.add_argument("--corpus", default="data/alice_excerpt.txt")
-    parser.add_argument("--max-keys", type=int, default=2048)
+    parser.add_argument("--max-keys", type=int, default=4096)
+    parser.add_argument("--teacher-scale", type=int, default=16)
     parser.add_argument("--out-prefix", default="qwen7b_hybrid")
     args = parser.parse_args()
 
@@ -60,6 +61,7 @@ def main() -> int:
     build.mkdir(parents=True, exist_ok=True)
     ngram = build / "qwen7b_ngram.ntr"
     hybrid = build / f"{args.out_prefix}.ntr"
+    scaled = build / "qwen7b_teacher_scaled.ntr"
     card = Path(str(teacher) + ".card.json")
     corpus_size = corpus.stat().st_size
     train_end = int(corpus_size * 0.85)
@@ -70,11 +72,17 @@ def main() -> int:
        cwd=REPO)
 
     print("=== hybrid backoff ===", flush=True)
+    if args.teacher_scale < 1:
+        raise SystemExit("--teacher-scale must be >= 1")
     sh(["./build/nanlm_teacher", "build-ngram", str(corpus), str(ngram),
         "0", str(train_end), "4"], cwd=REPO)
+    sh(["./build/nanlm_teacher", "scale", str(scaled), str(teacher),
+        "1", str(args.teacher_scale)], cwd=REPO)
     sh(["./build/nanlm_teacher", "merge", str(hybrid), str(ngram),
-        str(teacher)], cwd=REPO)
+        str(scaled)], cwd=REPO)
     sh(["./build/nanlm_teacher", "stats", str(teacher)], cwd=REPO)
+    sh(["./build/nanlm_teacher", "stats", str(ngram)], cwd=REPO)
+    sh(["./build/nanlm_teacher", "stats", str(scaled)], cwd=REPO)
     sh(["./build/nanlm_teacher", "stats", str(hybrid)], cwd=REPO)
 
     slot8_tsv = build / f"{args.out_prefix}_slot8.tsv"
@@ -112,7 +120,7 @@ def main() -> int:
         "--boot", "5000"], cwd=REPO)
 
     print("=== package ===", flush=True)
-    files = [teacher, card, ngram, hybrid, slot8_tsv, slot3_tsv, slot8_nas,
+    files = [teacher, card, ngram, scaled, hybrid, slot8_tsv, slot3_tsv, slot8_nas,
              slot8_exp, slot8_man, slot3_nas, slot3_exp, slot3_man]
     tar = WORK / "qwen7b_hybrid_run.tgz"
     sh(["tar", "czf", str(tar), "-C", str(REPO)] +

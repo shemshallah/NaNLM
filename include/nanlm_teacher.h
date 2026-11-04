@@ -33,6 +33,8 @@ int nanlm_teacher_write(const char *path, const nanlm_teacher_rec *rec,
                         size_t n);
 int nanlm_teacher_read(const char *path, nanlm_teacher_rec **out, size_t *out_n);
 int nanlm_teacher_merge(const char *out_path, const char **in_paths, int n_in);
+int nanlm_teacher_scale(const char *out_path, const char *in_path,
+                        uint32_t numerator, uint32_t denominator);
 int nanlm_teacher_stats(const char *path, uint64_t *contexts,
                         uint64_t *records, uint64_t *weight);
 

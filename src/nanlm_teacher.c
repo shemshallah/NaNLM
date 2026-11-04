@@ -220,6 +220,24 @@ int nanlm_teacher_merge(const char *out_path, const char **in_paths,
     return k;
 }
 
+int nanlm_teacher_scale(const char *out_path, const char *in_path,
+                        uint32_t numerator, uint32_t denominator) {
+    nanlm_teacher_rec *rec = NULL;
+    size_t n = 0, i;
+    int rc;
+    if (!out_path || !in_path || denominator == 0) return -1;
+    if (nanlm_teacher_read(in_path, &rec, &n) != 0) return -1;
+    for (i = 0; i < n; i++) {
+        uint64_t w = (uint64_t)rec[i].weight * numerator;
+        w = (w + denominator / 2u) / denominator;
+        if (w == 0 && rec[i].weight != 0) w = 1;
+        rec[i].weight = (uint16_t)(w > 65535u ? 65535u : w);
+    }
+    rc = nanlm_teacher_write(out_path, rec, n);
+    free(rec);
+    return rc;
+}
+
 int nanlm_teacher_stats(const char *path, uint64_t *contexts,
                         uint64_t *records, uint64_t *weight) {
     nanlm_teacher_rec *rec = NULL;

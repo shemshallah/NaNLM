@@ -168,7 +168,42 @@ and classifier are not vacuous:
 - swapping prototypes 0/1 changes the class labels and fails;
 - a 1,000-step starvation run truncates the output and fails.
 
-## 6. Additional checks
+## 6. M2b byte-level language-model base
+
+Build, assemble, run, and diff:
+
+```sh
+sh tools/build_lm.sh
+```
+
+Output:
+
+```
+nanlm-lm: dim=2048 vocab=256 queries=32 context=3
+train_bytes=25500 val_bytes=4500 train_frac=0.850
+hdc_top1=25.00% ngram_top1=50.00%
+ngram_bpc=3.7786 (HDC probability calibration not implemented)
+build_lm: PASS (32 queries)
+build_lm: NEGATIVE PASS (zero positions rejected)
+build_lm: NEGATIVE PASS (predicted prototypes rejected)
+build_lm: NEGATIVE PASS (step starvation rejected)
+```
+
+The NaNLM VM trace:
+
+```
+[nanlm-vm] nan-text: 70286116 steps, rc=3, pc=40, trap=''
+```
+
+This is a real byte-level model: 2,048-bit codebook, 256 byte classes, four
+prototypes per class, three-byte context, held-out Alice excerpt. The runtime
+matches the C adapter on all 32 predicted bytes and hashes. The honest result
+is that the order-3 n-gram wins (50% vs 25% top-1), and HDC probability
+calibration is not implemented.
+
+The model is a structural base, not a quality claim.
+
+## 7. Additional checks
 
 - ASan + UBSan builds of `test_word`, `test_vec`, `test_model`, and `test_ctx` pass.
 - The same pipeline was run with `--dim 512 --classes 8 --queries 16` and
@@ -178,11 +213,12 @@ and classifier are not vacuous:
 
 ## What is not proven yet
 
-- M2a is a synthetic 16-class context model, not a language model.
-- The 8,192-bit, 256-byte corpus model has not been trained or run.
+- M2b is a byte-level structural base, not a competitive language model; the
+  n-gram baseline wins 50% to 25% top-1.
+- HDC bits/byte is not calibrated; only the n-gram BPC is reported.
+- The 8,192-bit byte model has not been trained or run.
 - The seal/loader path does not exist yet.
-- No benchmark against an n-gram has been run.
-- CI has not run on x86-64 yet.
+- CI has not run on x86-64 yet (the next push will test it).
 - The runtime template is still embedded in C, not a standalone `.nas` file.
 
 The next gate is M2: context binding and bundling in the NaN16 runtime, then a

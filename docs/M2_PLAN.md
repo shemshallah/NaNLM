@@ -10,11 +10,19 @@ It did **not** prove the model is interesting. M1 is a synthetic prototype
 classifier. The runtime does not yet bind or bundle; it only does XOR +
 popcount inside Hamming. M2 fixes that in two stages.
 
-**Status:** M2a is implemented and passing. The NaN16 runtime now performs
+**Status:** M2a is implemented and passing. M2b is implemented as a structural
+base and is honest about quality. The NaN16 runtime performs
 `v_i = C[b_i] XOR P[i]`, bundles three vectors with majority, hashes the
 encoded query, and prints `CC HHHHHHHH`. The C adapter and the `.nan` runtime
-agree on all 16 class/hash pairs. Zeroed positions, swapped prototypes, and
-step starvation all fail the differential gate.
+agree on all M2a and M2b queries and hashes. Zeroed positions, swapped
+prototypes, and step starvation all fail the differential gate.
+
+M2b results on the 30 KB Alice excerpt:
+
+- 25% top-1 vs 50% for an order-3 n-gram;
+- n-gram 3.78 bits/byte; HDC probability calibration is not implemented;
+- the runtime matches the C adapter on every predicted byte and hash;
+- ~70M VM steps for 32 held-out contexts.
 
 ## M2a — force the runtime to use binding and bundling
 
@@ -55,26 +63,29 @@ same query vector, and both classifiers must return the same class.
 
 Switch the vocabulary to 256 bytes and use a real text corpus.
 
-| parameter | M2b value |
-|---|---:|
-| D | 8,192 bits |
-| words per vector | 256 |
-| vocabulary | 256 |
-| context | 3 bytes |
-| codebook | 256 × 256 = 65,536 words |
-| positions | 3 × 256 = 768 words |
-| prototypes | 256 × 256 = 65,536 words |
-| query set | 64 × 256 = 16,384 words |
-| total | ~148k words = 1.18 MB |
+| parameter | current M2b base | next scale |
+|---|---:|---:|
+| D | 2,048 bits | 8,192 bits |
+| words per vector | 64 | 256 |
+| vocabulary | 256 | 256 |
+| context | 3 bytes | 3 bytes |
+| codebook | 256 × 64 = 16,384 words | 65,536 words |
+| positions | 3 × 64 = 192 words | 768 words |
+| prototypes | 256 × 4 × 64 = 65,536 words | 262,144 words |
+| query set | 32 × 3 ids | 64 × 3 ids |
+| total | ~82k words = 0.66 MB | ~1.18 MB+ |
 
 ### Training
 
 1. Split corpus into train/validation by byte offset, not by random shuffle.
 2. For each position `t` with at least 3 bytes of context:
    - encode `(x[t-2], x[t-1], x[t])` into a query vector;
-   - increment bit-sliced counters for class `x[t+1]`.
+   - choose a prototype bucket from the query hash;
+   - increment bit-sliced counters for `(next byte, bucket)`.
 3. Prototype bit = majority of counters.
-4. Evaluate on held-out bytes.
+4. Four prototypes per byte are interleaved; the runtime returns
+   `prototype_index >> 2` as the byte.
+5. Evaluate on held-out bytes.
 
 This is an order-3 HDC associative memory. It is not backprop. It may lose to a
 plain order-3 n-gram; that is a valid, publishable result.

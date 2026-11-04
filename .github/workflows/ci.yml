@@ -18,3 +18,5 @@ jobs:
         run: make model-check
       - name: M2a context gate
         run: make model-ctx-check
+      - name: byte-level LM gate
+        run: make model-lm-check

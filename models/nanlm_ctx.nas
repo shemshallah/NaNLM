@@ -4,6 +4,7 @@
 .equ VW 64
 .equ NQ 16
 .equ CTX 3
+.equ PROTOSHIFT 0
 .equ BEST_INIT 2049
 .org 0
 main:
@@ -25,6 +26,7 @@ CALL @hash
 ST r1,r0,@m_hash
 LA r1,@qbuf
 CALL @predict
+SHR r1,r1,#PROTOSHIFT
 ST r1,r0,@m_class
 LD r1,r0,@m_class
 CALL @puthex2

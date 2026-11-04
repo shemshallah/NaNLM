@@ -1,4 +1,5 @@
 #include "nanlm_ctx.h"
+#include "nanlm_runtime.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -233,6 +234,7 @@ static const char RUNTIME[] =
     "ST r1,r0,@m_hash\n"
     "LA r1,@qbuf\n"
     "CALL @predict\n"
+    "SHR r1,r1,#PROTOSHIFT\n"
     "ST r1,r0,@m_class\n"
     "LD r1,r0,@m_class\n"
     "CALL @puthex2\n"
@@ -545,6 +547,8 @@ static const char RUNTIME[] =
     "ph8_val:\n"
     ".word 0\n";
 
+const char *nanlm_runtime_source(void) { return RUNTIME; }
+
 static int emit_vec(FILE *f, const nanlm_vec *v) {
     size_t i;
     for (i = 0; i < v->words; i++) {
@@ -569,9 +573,10 @@ int nanlm_ctx_emit_nas(const nanlm_ctx_model *m, const char *path) {
     fprintf(f, ".equ VW %u\n", m->words);
     fprintf(f, ".equ NQ %u\n", m->nqueries);
     fprintf(f, ".equ CTX %u\n", NANLM_CTX_LEN);
+    fprintf(f, ".equ PROTOSHIFT 0\n");
     fprintf(f, ".equ BEST_INIT %u\n", m->dim + 1u);
     fprintf(f, ".org 0\n");
-    if (fputs(RUNTIME, f) == EOF) ok = 0;
+    if (fputs(nanlm_runtime_source(), f) == EOF) ok = 0;
     fprintf(f, ".org 8192\n");
     fprintf(f, "codebook:\n");
     for (i = 0; i < m->classes * NANLM_CTX_LEN && ok; i++) {

@@ -27,11 +27,13 @@ hyperdimensional associative memory that predicts the next character in a
 short context. It is **not** a transformer competitor. It is a substrate
 experiment with a measurable baseline.
 
-**Status:** M1 and M2a pass. The NaN16 runtime now binds three codebook
-vectors with position vectors, bundles them by majority, hashes the encoded
-query, and classifies it. The 2,048-bit context model matches the C adapter on
-all 16 class labels and hashes. Negative gates prove that zeroed positions,
-swapped prototypes, and step starvation all fail the diff.
+**Status:** M1, M2a, and the byte-level M2b structural base pass. The NaN16
+runtime binds three codebook vectors with position vectors, bundles them by
+majority, hashes the encoded query, and classifies it. The 2,048-bit
+byte-level model runs 32 held-out contexts on `nanlm_vm` in ~70M steps and
+matches the C adapter on every predicted byte and query hash. The honest
+quality number is **25% top-1 vs 50% for an order-3 n-gram**; this is a
+structural base, not a competitive LM.
 
 ## What this is
 
@@ -52,25 +54,26 @@ swapped prototypes, and step starvation all fail the diff.
 - Not an LLM. The first model is a small associative predictor with honest
   baselines.
 
-## The first real model (M2 target)
+## The byte-level M2b base
 
-M2a now exercises binding and bundling on a synthetic context model. M2b
-switches the vocabulary to bytes and adds a real corpus plus an n-gram
-baseline. The table below is the M2b target.
+M2a exercises binding and bundling on a synthetic context model. M2b switches
+the vocabulary to bytes and adds a real corpus plus an n-gram baseline. The
+table below describes the current M2b base.
 
 `NaNLM-0` (working name):
 
 | property | value |
 |---|---|
-| vector dimension | 8,192 bits = 256 NaN words |
+| vector dimension | 2,048 bits = 64 NaN words (8,192 is the next scale) |
 | vocabulary | byte-level, 256 symbols |
-| context | 3 bound symbols, majority-bundled |
-| memory | one prototype per next-byte class |
+| context | 3 bound bytes, majority-bundled |
+| memory | 4 prototypes per next-byte class |
 | similarity | Hamming distance / popcount |
 | training | integer bit-sliced counters in the C adapter |
 | inference | NaN16 `BOOL`, `ADD`, `SHL`, `SHR`, `LD`, `ST`, `JMP` |
 | arithmetic | integer only; no FP in the model |
-| model size | ~256 KB of NaN words including codebook |
+| model size | ~0.7 MB of NaN words including codebook |
+| quality | 25% top-1 / order-3 n-gram 50% on the Alice excerpt |
 
 The point is not the score. The point is that every weight is a gated NaN
 word, every operation is a Boolean function, and the whole model can be
@@ -95,6 +98,12 @@ query-vector hash gate:
 sh tools/build_ctx.sh
 ```
 
+To run the byte-level M2b language-model base on `data/alice_excerpt.txt`:
+
+```sh
+sh tools/build_lm.sh
+```
+
 M2a output is `CC HHHHHHHH`: two hex class digits, a space, and the FNV-1a hash
 of the encoded query vector. The negative gates zero the position vectors,
 swap prototypes 0/1, and starve the step budget; all three must fail.
@@ -103,9 +112,10 @@ Everything runs locally: the model is assembled by `build/nanlm_asm` and
 executed by `build/nanlm_vm`. No external tree or native runtime is required.
 
 The first model is a 2,048-bit, 16-class synthetic prototype classifier. It is
-a pipeline proof, not a language model. M2a adds the actual HDC operations:
+a pipeline proof. M2a adds the actual HDC operations:
 `v_i = C[b_i] XOR P[i]`, `q = majority(v_0,v_1,v_2)`. M2b replaces the synthetic
-classes with bytes and a held-out text corpus.
+classes with 256 byte classes, four prototypes per byte, and a held-out Alice
+excerpt. The n-gram baseline wins today; the model card says so.
 
 The tests verify the parts that must not drift:
 

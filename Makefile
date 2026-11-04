@@ -4,7 +4,7 @@ LDFLAGS ?=
 
 BUILD := build
 
-.PHONY: all test clean model model-check model-ctx model-ctx-check lane-check
+.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check lane-check
 
 all: test
 
@@ -28,6 +28,9 @@ $(BUILD)/test_ctx: tests/test_ctx.c src/nanlm_ctx.c src/nanlm_vec.c include/nanl
 
 $(BUILD)/nanlm_ctx_train: tools/nanlm_ctx_train.c src/nanlm_ctx.c src/nanlm_vec.c include/nanlm_ctx.h include/nanlm_vec.h include/nan16_word.h | $(BUILD)
 	$(CC) $(CFLAGS) tools/nanlm_ctx_train.c src/nanlm_ctx.c src/nanlm_vec.c -o $@ $(LDFLAGS)
+
+$(BUILD)/nanlm_lm_train: tools/nanlm_lm_train.c src/nanlm_lm.c src/nanlm_vec.c include/nanlm_lm.h include/nanlm_vec.h include/nanlm_runtime.h include/nan16_word.h | $(BUILD)
+	$(CC) $(CFLAGS) tools/nanlm_lm_train.c src/nanlm_lm.c src/nanlm_ctx.c src/nanlm_vec.c -o $@ $(LDFLAGS) -lm
 
 $(BUILD)/nanlm_asm: tools/nanlm_asm.c src/nanlm_asm.c include/nanlm_asm.h include/nan16_word.h | $(BUILD)
 	$(CC) $(CFLAGS) tools/nanlm_asm.c src/nanlm_asm.c -o $@ $(LDFLAGS)
@@ -59,5 +62,11 @@ model-ctx: $(BUILD)/nanlm_ctx_train
 model-ctx-check: $(BUILD)/nanlm_ctx_train
 	sh tools/build_ctx.sh
 
+model-lm: $(BUILD)/nanlm_lm_train
+	./$(BUILD)/nanlm_lm_train --out models/nanlm_lm.nas --expected models/nanlm_lm.expected --manifest models/nanlm_lm.manifest
+
+model-lm-check: $(BUILD)/nanlm_lm_train
+	sh tools/build_lm.sh
+
 clean:
-	rm -rf $(BUILD) models/nanlm0.nas models/nanlm0.nan models/nanlm0.expected models/nanlm0.manifest models/nanlm_ctx.nas models/nanlm_ctx.nan models/nanlm_ctx.expected models/nanlm_ctx.manifest
+	rm -rf $(BUILD) models/nanlm0.nas models/nanlm0.nan models/nanlm0.expected models/nanlm0.manifest models/nanlm_ctx.nas models/nanlm_ctx.nan models/nanlm_ctx.expected models/nanlm_ctx.manifest models/nanlm_lm.nas models/nanlm_lm.nan models/nanlm_lm.expected models/nanlm_lm.manifest

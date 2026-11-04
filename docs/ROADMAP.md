@@ -48,14 +48,20 @@ language model.
 - [x] M2a: query-vector FNV hash gate; class + hash must match.
 - [x] M2a: negative gates for zeroed positions, swapped prototypes, and step
       starvation.
-- [ ] M2b: 8,192-bit, 256-byte vocabulary.
-- [ ] M2b: codebook, position vectors, prototypes, held-out corpus.
-- [ ] M2b: seal A/B/C and loader verification.
-- [ ] M2b: order-3 n-gram baseline.
-- [ ] M2b: held-out bits/byte and top-1 accuracy.
-- [ ] M2b: 60-second demo script.
+- [x] M2b base: 2,048-bit, 256-byte vocabulary, 4 prototypes per byte.
+- [x] M2b base: codebook, position vectors, prototypes, held-out Alice excerpt.
+- [x] M2b base: order-3 n-gram baseline.
+- [x] M2b base: held-out top-1 accuracy (25% HDC vs 50% n-gram).
+- [x] M2b base: `tools/build_lm.sh` end-to-end gate.
+- [ ] M2b next: 8,192-bit scale.
+- [ ] M2b next: seal A/B/C and loader verification.
+- [ ] M2b next: HDC probability calibration / bits-per-byte.
+- [ ] M2b next: 60-second demo script.
 
 **Exit gate:** a published result, including the case where the n-gram wins.
+
+**Result:** the n-gram wins on quality, but the byte-level `.nan` model runs on
+`nanlm_vm` and matches the C adapter on every predicted byte and hash.
 
 ## M3 — Experts and learning
 

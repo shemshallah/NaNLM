@@ -57,12 +57,29 @@ The CLI writes one status line to stderr:
 The model gates require `rc=3` and `trap=''`, then diff the serial output.
 A run that prints the right prefix before exhausting its budget is rejected.
 
+## Model runtime contract
+
+The shared runtime expects:
+
+- `.equ NVEC` — number of prototypes
+- `.equ VW` — words per vector
+- `.equ NQ` — queries
+- `.equ CTX` — context length (3)
+- `.equ PROTOSHIFT` — prototype index to class shift (`0` for one prototype
+  per class, `2` for four prototypes per byte)
+- `.equ BEST_INIT` — Hamming search sentinel (`dim + 1`)
+- data labels `codebook`, `positions`, `prototypes`, `query_ids`, `tmp0`,
+  `tmp1`, `tmp2`, `qbuf`
+
+The LM base uses four prototypes per byte, so `NVEC = 256 * 4` and
+`PROTOSHIFT = 2`.
+
 ## Scope and limits
 
 `nanlm_vm` implements the model runtime, not the museum OS. It does not provide
-VGA, keyboard, ATA, NaNFS, timers, or the full NaN16 op set. The native
-`kan16.xa` core is a separate performance path in the provenance tree; NaNLM
-does not depend on it.
+VGA, keyboard, ATA, NaNFS, timers, or the full NaN16 op set. A native core is
+a future performance option, not a dependency.
 
 The interpreter is intentionally simple and auditable. A future native/JIT
-backend must pass the same `.nan` differential gates.
+backend must pass the same `.nan` differential gates. NaNLM does not require a
+separate native core to run its models.

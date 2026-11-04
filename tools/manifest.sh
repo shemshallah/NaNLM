@@ -23,7 +23,10 @@ for f in \
     models/nanlm_lm.nan models/nanlm_lm.nas models/nanlm_lm.manifest \
     models/nanlm_slot.nan models/nanlm_slot.nas models/nanlm_slot.manifest \
     data/alice_excerpt.txt data/alice_full.txt data/PROVENANCE.md \
-    data/code_fixture/LICENSE data/code_fixture/README.md
+    data/code_fixture/LICENSE data/code_fixture/README.md \
+    models/qwen_0.5b/card.json models/qwen_0.5b/qwen_slot8.manifest \
+    models/qwen_0.5b/qwen_hybrid_slot8.manifest \
+    models/qwen_0.5b/qwen_hybrid_slot3.manifest
 do
     if [ -f "$f" ]; then
         $HASH "$f" >> "$OUT"

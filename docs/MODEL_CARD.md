@@ -1,5 +1,9 @@
 # Model card: NaNLM byte-level base
 
+> **Evaluation note (2026-11):** the 128-context metrics below are a smoke
+> test, not a model comparison. See [EVAL.md](EVAL.md) for the full held-out
+> stream, paired bootstrap intervals, and model-size accounting.
+
 ## Identity
 
 - **Name:** `nanlm_lm` (M2b structural base)

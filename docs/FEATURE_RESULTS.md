@@ -96,3 +96,21 @@ replaces the fixture without changing the path.
 5. **Mirror ensemble and capability loader.**
 
 The feature layer is real. The teacher is the missing quality ceiling.
+
+
+## 7. Full-stream correction and 8-slot / mixer status
+
+The 128-context table was too small: at n=128 the top-1 standard error is about
+±4.4 points. On the full 4,497-byte held-out stream:
+
+| model | top-1 | BPC |
+|---|---:|---:|
+| 3-slot typed memory | **49.05%** | **2.9593** |
+| 3-gram | 48.14% | 3.4196 |
+| 8-slot (fixture teacher) | 44.79% | 3.7648 |
+| static mixer (table 14) | 45.97% | 3.7249 |
+
+The 3-slot BPC win is real (paired CI excludes zero); the top-1 difference is a
+tie. The 8-slot fixture-teacher and static-mixer rows are negatives, not
+verdicts on the 8-byte or PAQ directions. See `docs/EVAL.md`, `docs/QWEN.md`,
+and `docs/MIXER.md`.

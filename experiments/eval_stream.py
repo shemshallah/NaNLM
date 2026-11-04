@@ -20,6 +20,7 @@ The model file is counted once; a bigger model must earn its bytes.
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import random
 from pathlib import Path
@@ -118,9 +119,19 @@ def evaluate(label: str, log_path: Path, model_path: Path | None,
     ng_bpc = sum(r[1] for r in rows) / n
     slot_top1 = 100.0 * sum(r[2] for r in rows) / n
     ng_top1 = 100.0 * sum(r[3] for r in rows) / n
-    model_bytes = model_path.stat().st_size if model_path and model_path.exists() else 0
+    model_bytes = 0
+    model_gzip = 0
+    if model_path is not None:
+        if isinstance(model_path, int):
+            model_bytes = model_gzip = model_path
+        elif model_path.exists():
+            raw = model_path.read_bytes()
+            model_bytes = len(raw)
+            model_gzip = len(gzip.compress(raw, 9))
     total_bits = sum(r[0] for r in rows) + 8.0 * model_bytes
     total_bpc = total_bits / n
+    total_bits_gzip = sum(r[0] for r in rows) + 8.0 * model_gzip
+    total_bpc_gzip = total_bits_gzip / n
     cis = bootstrap(rows, block, n_boot, seed)
     return {
         "label": label,
@@ -138,8 +149,11 @@ def evaluate(label: str, log_path: Path, model_path: Path | None,
         "diff_bpc_ci": cis["diff_bpc"],
         "diff_top1_ci": cis["diff_top1"],
         "model_bytes": model_bytes,
+        "model_gzip": model_gzip,
         "model_bpc": 8.0 * model_bytes / n,
+        "model_bpc_gzip": 8.0 * model_gzip / n,
         "total_bpc": total_bpc,
+        "total_bpc_gzip": total_bpc_gzip,
     }
 
 
@@ -163,16 +177,21 @@ def main() -> int:
         if len(parts) < 2:
             parser.error("--run needs LABEL=LOG[=MODEL]")
         label, log = parts[0], Path(parts[1])
-        model = Path(parts[2]) if len(parts) > 2 and parts[2] else None
+        model = None
+        if len(parts) > 2 and parts[2]:
+            if parts[2].startswith("@"):
+                model = int(parts[2][1:])
+            else:
+                model = Path(parts[2])
         results.append(evaluate(label, log, model, args.block, args.boot, args.seed))
 
-    print("| run | bytes | top1 | BPC | diff top1 | diff BPC | model B | total BPC |")
-    print("|---|---:|---:|---:|---:|---:|---:|---:|")
+    print("| run | bytes | top1 | BPC | diff top1 | diff BPC | model B | model gzip B | total BPC (gzip) |")
+    print("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     for r in results:
         print(f"| {r['label']} | {r['n']} | {r['slot_top1']:.2f}% | "
               f"{r['slot_bpc']:.4f} | {r['diff_top1']:+.2f} | "
               f"{r['diff_bpc']:+.4f} | {r['model_bytes']} | "
-              f"{r['total_bpc']:.4f} |")
+              f"{r['model_gzip']} | {r['total_bpc_gzip']:.4f} |")
     print()
     for r in results:
         print(f"{r['label']}:")
@@ -185,8 +204,9 @@ def main() -> int:
         print(f"  paired diff top1 95% CI: "
               f"[{fmt(r['diff_top1_ci'][0], 2)}, "
               f"{fmt(r['diff_top1_ci'][1], 2)}] points")
-        print(f"  model bytes: {r['model_bytes']} "
-              f"({r['model_bpc']:.4f} BPC equivalent)")
+        print(f"  model bytes: {r['model_bytes']} raw / "
+              f"{r['model_gzip']} gzip "
+              f"({r['model_bpc_gzip']:.4f} BPC equivalent gzip)")
     if args.json:
         Path(args.json).write_text(json.dumps(results, indent=2) + "\n",
                                    encoding="utf-8")

@@ -257,9 +257,10 @@ make teacher-slot-check
 Output:
 
 ```
-teacher-slot: teacher_records=97124 contexts=16376 keys=4094
-eval_n=128 hdc_top1=33.59% hdc_bpc=3.5187
-ngram_top1=55.47% ngram_bpc=3.1324
+teacher-slot: teacher_records=83504 contexts=15312 keys=3828
+eval_n=128 hdc_top1=52.34% hdc_bpc=3.6219
+stream_n=4497 stream_top1=49.05% stream_bpc=3.9316
+ngram_top1=55.47% ngram_bpc=3.1307
 teacher_slot: PASS (32 queries)
 ```
 
@@ -279,7 +280,8 @@ prototype memory as the direct corpus trainer:
 
 ```
 shard-slot: shard_records=8317 keys=3832
-eval_n=128 hdc_top1=52.34% hdc_bpc=2.6703
+eval_n=128 hdc_top1=52.34% hdc_bpc=2.6608
+stream_n=4497 stream_top1=49.05% stream_bpc=2.9593
 ngram_top1=55.47% ngram_bpc=3.1304
 shard_slot: corpus == shard compile PASS
 shard_slot: VM PASS (32 queries)
@@ -309,7 +311,62 @@ The code fixture is tiny and high-entropy; its quality numbers are a plumbing
 check, not a code-model claim. The important result is deterministic
 provenance-to-runtime closure.
 
-## 11. Additional checks
+## 11. Full held-out stream, not 128 contexts
+
+```sh
+make eval-check
+```
+
+The 128-context split was too small: the binomial standard error near 50% is
+about ±4.4 points, so 52.3% vs 55.5% was a statistical tie. Every held-out byte
+is now scored, with paired moving-block bootstrap intervals and model-size
+accounting.
+
+```
+slot3: 4497 bytes  top1=49.05%  bpc=2.9593
+ngram:             top1=48.14%  bpc=3.4196
+paired dBPC 95% CI: [-0.5214, -0.3989]
+paired dTop1 95% CI: [-0.13, +2.02] points
+```
+
+The BPC win is real; the top-1 difference is a tie. The result is recorded in
+[docs/EVAL.md](EVAL.md) with the Hutter-style model-size penalty. On a 4.5 KB
+stream the 3-slot `.nas` (65.9 KB gzip) dominates total BPC; model size is now
+part of the evidence, not hidden.
+
+## 12. Signed 32-bit shards and exact unlearning
+
+```sh
+make shard2-check
+```
+
+Output:
+
+```
+shard2: A+B == B+A PASS
+shard2: B + (-B) == empty PASS
+shard2: (A+B)+(-B) == A PASS (exact unlearning)
+```
+
+Counts are signed 32-bit integers added with two's-complement modular
+arithmetic. A takedown is a negated shard; a generation can be rebuilt by
+re-merging without the offending shard. The older uint16 shard remains for
+compatibility; the signed format is the unlearning path.
+
+## 13. 8-slot and mixer first results
+
+`make slot8-check` runs an 8-byte / 16-slot student (8 byte + 8 ctype slots)
+with recency-graded codewords and suffix-covering prototype selection. With the
+fixture n-gram teacher it scores 44.79% / 3.765 BPC on the full stream, worse
+than the 3-slot memory and the n-gram. This is a fixture-teacher result, not a
+verdict on 8-byte context with a real Qwen teacher.
+
+`make mixer-check` runs the C99 multi-order mixer. Its static equal-weight
+variant scores 45.97% / 3.725 BPC at table 14; the learned mixer update was
+unstable and is disabled by default. The first mixer is a negative result, not
+a PAQ claim. The design and next steps are in [docs/MIXER.md](MIXER.md).
+
+## 14. Additional checks
 
 - ASan + UBSan builds of `test_word`, `test_vec`, `test_model`, and `test_ctx` pass.
 - The same pipeline was run with `--dim 512 --classes 8 --queries 16` and
@@ -320,18 +377,23 @@ provenance-to-runtime closure.
 ## What is not proven yet
 
 - The class memory (M2b) loses to the n-gram: 26.6% / 5.50 BPC vs 50.0% / 3.85.
-- The slot memory (M3) wins bits-per-byte (2.67 vs 3.13) but loses top-1
-  (52.3% vs 55.5%) on the 128-context Alice split.
+- The slot memory (M3) wins BPC on the full stream (2.959 vs 3.420; paired CI
+  excludes zero) but top-1 is a statistical tie (49.05% vs 48.14%).
 - The teacher → typed slot pipeline exists and passes plumbing, but the fixture
   teacher is not smart enough to beat the n-gram.
 - The continuous code fixture is a plumbing result; it is not a code-quality
   result and does not beat the n-gram on BPC.
+- The 8-slot fixture-teacher student is worse than 3-slot; real Qwen teacher
+  artifacts are still pending.
+- The first mixer loses BPC and its learned weight update was unstable.
+- Model size dominates Hutter-style totals on a 4.5 KB stream; packed
+  bit-plane pages and native kernels are designed but not implemented.
 - reporam/repovram page mapping and generation manifests are designed but not
   implemented as a live service.
 - The seal/loader path does not exist yet.
-- The 8-slot student and a real Qwen teacher run have not been completed.
 - CI runs the full gates on x86-64; local gates run on aarch64.
 
-The next gate is a real teacher (Qwen/byte-level) on a pinned code slice, an
-8-slot student, and a held-out code card. The runner-ring control plane and the
-shard→slot compile path are already in place.
+The next gates are: Qwen teacher card on a held-out code stream, an 8-slot
+student with a real teacher, a stable per-bit mixer, and a packed page + native
+kernel whose hashes match `nanlm_vm`. The continuous supply and shard algebra
+are already in place.

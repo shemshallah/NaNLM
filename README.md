@@ -31,18 +31,19 @@ hyperdimensional associative memory that predicts the next character in a
 short context. It is **not** a transformer competitor. It is a substrate
 experiment with a measurable baseline.
 
-**Status:** M1, M2a, M2b, and the M3 simplex slot memory pass. The NaN16
-runtime runs the byte-level class memory (26.6% top-1 / 5.50 BPC) and the slot
-memory (**52.3% top-1 / 2.67 BPC** vs the in-repo interpolated n-gram
-**55.5% / 3.13 BPC** on 128 held-out contexts). The slot memory wins
-bits-per-byte and loses top-1 on this small corpus; the distributed plan is
-how it scales.
+**Status:** M1, M2a, M2b, and the M3 simplex slot memory pass. On the
+**full 4,497-byte held-out stream** the slot memory reaches **49.05% top-1 /
+2.959 BPC**; the interpolated n-gram reaches **48.14% / 3.420 BPC**. The paired
+block-bootstrap BPC difference is decisive
+(**−0.460 [−0.521, −0.399]**), while the top-1 difference is a statistical tie
+(**+0.91 [−0.13, +2.02]** points). The old 52.3% vs 55.5% comparison used 128
+sampled contexts and was too small to separate the models.
 
 The continuous-training path is now closed end-to-end: pinned repository →
 license/secret-filtered chunks → additive shards → typed slot memory → `.nas` →
-`nanlm_vm`. `make continuous-check` also exercises a four-runner ring with a
-failed runner. The current code quality is a plumbing result, not a quality
-claim.
+`nanlm_vm`. Signed 32-bit shards make unlearning a re-merge; the 8-slot student
+and multi-order mixer exist, but their first results are negative. Model-size
+accounting is now part of the evidence.
 
 ## What this is
 
@@ -140,6 +141,21 @@ runner-ring failover plan:
 make continuous-check
 ```
 
+To score every held-out byte with paired bootstrap intervals and model-size
+accounting:
+
+```sh
+./build/nanlm_slot_train --corpus data/alice_excerpt.txt   --eval-log build/slot_stream.tsv   --out build/slot_stream.nas --expected build/slot_stream.expected   --manifest build/slot_stream.manifest
+python3 experiments/eval_stream.py   --run slot3=build/slot_stream.tsv=build/slot_stream.nas
+```
+
+To build and run the 8-byte / 16-slot student and the multi-order mixer:
+
+```sh
+make slot8-check
+make mixer-check
+```
+
 M2a output is `CC HHHHHHHH`: two hex class digits, a space, and the FNV-1a hash
 of the encoded query vector. The negative gates zero the position vectors,
 swap prototypes 0/1, and starve the step budget; all three must fail.
@@ -177,6 +193,10 @@ The tests verify the parts that must not drift:
 - [NaN LUT / Regime Network](docs/LUT_REGIME.md) — the special architecture candidate and its decisive tests.
 - [Regime results](docs/REGIME_RESULTS.md) — fixed vs learned-router LUT trees, with controls.
 - [Feature and teacher probes](docs/FEATURE_RESULTS.md) — typed ctype gain, learned-feature and small-teacher negatives.
+- [Full-stream evaluation](docs/EVAL.md) — why 128 contexts were not enough, bootstrap CIs, and Hutter-style model accounting.
+- [Multi-order context mixing](docs/MIXER.md) — PAQ/lpaq-style template bank, integer mixer, and the first negative result.
+- [Packing and fast kernels](docs/PACKING.md) — bit-plane pages, VM conformance, additive HDC counters, and the T1/T2/T3 split.
+- [Qwen teacher runner](docs/QWEN.md) — the first real Qwen run, its teacher card, and why 0.5B/256 samples is not enough.
 - [Model 0](docs/MODEL_0.md) — a concrete, buildable first model.
 - [M2 plan](docs/M2_PLAN.md) — context binding, a real corpus, and negative gates.
 - [C adapter](docs/ADAPTER.md) — the S6 boundary and the `.nan` compiler.

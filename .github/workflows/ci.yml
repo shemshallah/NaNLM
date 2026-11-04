@@ -34,6 +34,10 @@ jobs:
         run: make shard-slot-check
       - name: continuous code pipeline gate
         run: make continuous-check
+      - name: full-stream evaluation gate
+        run: make eval-check
+      - name: multi-order mixer smoke gate
+        run: make mixer-check
       - name: 8-byte / 16-slot student gate
         run: make slot8-check
       - name: teacher shard gate

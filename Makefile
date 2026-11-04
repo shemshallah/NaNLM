@@ -4,7 +4,7 @@ LDFLAGS ?=
 
 BUILD := build
 
-.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check slot8-check shard-check shard2-check shard-slot-check teacher-check teacher-slot-check continuous-check regime-check layers-check lut-check lane-check manifest
+.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check slot8-check shard-check shard2-check mixer-check eval-check shard-slot-check teacher-check teacher-slot-check continuous-check regime-check layers-check lut-check lane-check manifest
 
 all: test
 
@@ -19,6 +19,9 @@ $(BUILD)/test_vec: tests/test_vec.c src/nanlm_vec.c include/nanlm_vec.h include/
 
 $(BUILD)/test_model: tests/test_model.c src/nanlm_model.c src/nanlm_vec.c include/nanlm_model.h include/nanlm_vec.h include/nan16_word.h | $(BUILD)
 	$(CC) $(CFLAGS) tests/test_model.c src/nanlm_model.c src/nanlm_vec.c -o $@ $(LDFLAGS)
+
+$(BUILD)/test_fast: tests/test_fast.c src/nanlm_fast.c include/nanlm_fast.h include/nan16_word.h | $(BUILD)
+	$(CC) $(CFLAGS) tests/test_fast.c src/nanlm_fast.c -o $@ $(LDFLAGS)
 
 $(BUILD)/nanlm_train: tools/nanlm_train.c src/nanlm_model.c src/nanlm_vec.c include/nanlm_model.h include/nanlm_vec.h include/nan16_word.h | $(BUILD)
 	$(CC) $(CFLAGS) tools/nanlm_train.c src/nanlm_model.c src/nanlm_vec.c -o $@ $(LDFLAGS)
@@ -50,6 +53,9 @@ $(BUILD)/nanlm_shard: tools/nanlm_shard.c src/nanlm_shard.c include/nanlm_shard.
 $(BUILD)/nanlm_shard2: tools/nanlm_shard2.c src/nanlm_shard2.c include/nanlm_shard2.h | $(BUILD)
 	$(CC) $(CFLAGS) tools/nanlm_shard2.c src/nanlm_shard2.c -o $@ $(LDFLAGS)
 
+$(BUILD)/nanlm_mixer: tools/nanlm_mixer.c src/nanlm_mixer.c include/nanlm_mixer.h | $(BUILD)
+	$(CC) $(CFLAGS) tools/nanlm_mixer.c src/nanlm_mixer.c -o $@ $(LDFLAGS) -lm
+
 $(BUILD)/nanlm_teacher: tools/nanlm_teacher.c src/nanlm_teacher.c include/nanlm_teacher.h | $(BUILD)
 	$(CC) $(CFLAGS) tools/nanlm_teacher.c src/nanlm_teacher.c -o $@ $(LDFLAGS) -lm
 
@@ -59,11 +65,12 @@ $(BUILD)/nanlm_shard_slot: tools/nanlm_shard_slot.c src/nanlm_shard.c src/nanlm_
 $(BUILD)/nanlm_teacher_slot: tools/nanlm_teacher_slot.c src/nanlm_slot.c src/nanlm_teacher.c include/nanlm_slot.h include/nanlm_teacher.h | $(BUILD)
 	$(CC) $(CFLAGS) tools/nanlm_teacher_slot.c src/nanlm_slot.c src/nanlm_teacher.c -o $@ $(LDFLAGS) -lm
 
-test: $(BUILD)/test_word $(BUILD)/test_vec $(BUILD)/test_model $(BUILD)/test_ctx
+test: $(BUILD)/test_word $(BUILD)/test_vec $(BUILD)/test_model $(BUILD)/test_ctx $(BUILD)/test_fast
 	./$(BUILD)/test_word
 	./$(BUILD)/test_vec
 	./$(BUILD)/test_model
 	./$(BUILD)/test_ctx
+	./$(BUILD)/test_fast
 
 model: $(BUILD)/nanlm_train
 	./$(BUILD)/nanlm_train --out models/nanlm0.nas --expected models/nanlm0.expected --manifest models/nanlm0.manifest
@@ -122,6 +129,12 @@ shard-check: $(BUILD)/nanlm_shard
 
 shard2-check: $(BUILD)/nanlm_shard2
 	sh tools/build_shard2.sh
+
+mixer-check: $(BUILD)/nanlm_mixer
+	sh tools/build_mixer.sh
+
+eval-check: $(BUILD)/nanlm_slot_train
+	sh tools/build_eval.sh
 
 shard-slot-check: $(BUILD)/nanlm_shard_slot
 	sh tools/build_shard_slot.sh

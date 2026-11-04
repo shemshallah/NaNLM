@@ -1,0 +1,7 @@
+{
+  "eval_n": 128,
+  "teacher_top1": 32.03125,
+  "teacher_bpc": 5.779818181917839,
+  "samples": 256,
+  "top_k": 8
+}

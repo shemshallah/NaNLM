@@ -204,7 +204,51 @@ result on 128 calibrated held-out contexts is that the order-3 n-gram wins:
 
 The model is a structural base, not a quality claim.
 
-## 7. Additional checks
+## 7. M3 simplex slot memory
+
+```sh
+sh tools/build_slot.sh
+```
+
+Output:
+
+```
+nanlm-slot: keys=3832 bits=765 queries=32
+eval_n=128 hdc_top1=51.56% hdc_bpc=2.7196
+ngram_top1=55.47% ngram_bpc=3.1304
+build_slot: PASS (32 queries)
+build_slot: NEGATIVE PASS (step starvation rejected)
+```
+
+The NaNLM VM trace:
+
+```
+[nanlm-vm] nan-text: 100695708 steps, rc=3, pc=39, trap=''
+```
+
+This is one prototype per observed 3-gram, with 255-bit simplex codewords in
+three slots. The runtime matches the C predictions and query hashes exactly.
+It wins bits-per-byte (2.72 vs 3.13) and loses top-1 (51.6% vs 55.5%) to the
+in-repo interpolated n-gram. Honest, not hidden.
+
+## 8. Additive shard merge
+
+```sh
+sh tools/build_shard.sh
+```
+
+Output:
+
+```
+shard_gate: PASS (A+B == B+A, byte-identical)
+shard_gate: PASS (total 14997 + 14997 = 29994)
+```
+
+Training is `(3-gram, next byte, count)`; merging is integer addition. Two
+corpus slices merged in either order produce byte-identical shards. This is
+the CRDT property that lets volunteers train without coordination.
+
+## 9. Additional checks
 
 - ASan + UBSan builds of `test_word`, `test_vec`, `test_model`, and `test_ctx` pass.
 - The same pipeline was run with `--dim 512 --classes 8 --queries 16` and
@@ -214,14 +258,18 @@ The model is a structural base, not a quality claim.
 
 ## What is not proven yet
 
-- M2b is a byte-level structural base, not a competitive language model; the
-  n-gram baseline wins 50.0% to 26.6% top-1 and 3.85 to 5.50 BPC.
-- HDC BPC is calibrated on a disjoint 128-context slice; it is still worse than
-  the n-gram (5.50 vs 3.85).
-- The 8,192-bit byte model has not been trained or run.
+- The class memory (M2b) loses to the n-gram: 26.6% / 5.50 BPC vs 50.0% / 3.85.
+- The slot memory (M3) wins bits-per-byte (2.72 vs 3.13) but loses top-1
+  (51.6% vs 55.5%) on the 128-context Alice split.
+- The slot model is built from a corpus, not yet compiled directly from merged
+  shards.
+- reporam/repovram page mapping and generation manifests are designed but not
+  implemented.
+- Teacher distillation (storing a small teacher's distribution) is not
+  implemented.
 - The seal/loader path does not exist yet.
-- CI runs the full gates on x86-64 and the local gates run on aarch64.
-- The runtime template is still embedded in C, not a standalone `.nas` file.
+- The 8,192-bit scale has not been retested.
+- CI runs the full gates on x86-64; local gates run on aarch64.
 
-The next gate is M2: context binding and bundling in the NaN16 runtime, then a
-real byte-level corpus with an n-gram baseline.
+The next gate is a merged shard → slot model → `.nan` build, then teacher
+distillation and a reporam/repovram generation.

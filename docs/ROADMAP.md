@@ -63,18 +63,32 @@ language model.
 **Result:** the n-gram wins on quality, but the byte-level `.nan` model runs on
 `nanlm_vm` and matches the C adapter on every predicted byte and hash.
 
-## M3 — Experts and learning
+## M3 — Associative memory and distributed training
 
-**Goal:** move beyond one circuit and one prototype.
+**Goal:** replace class centroids with a memory that can be trained by
+volunteers.
 
+- [x] Simplex slot memory: one prototype per observed 3-gram.
+- [x] `nanlm_slot` C model, `.nan` runtime, exact differential gate.
+- [x] Additive shard format `(3-gram, next-byte, count)`.
+- [x] Commutative merge gate (`A+B == B+A`).
+- [x] `docs/DISTRIBUTED.md`: reporam/repovram, volunteers, S3 path.
+- [ ] Shard-to-slot compile path (compile directly from merged shard).
+- [ ] Teacher distillation: store a small teacher's next-byte distribution.
+- [ ] reporam/repovram page mapping and a generation manifest.
+- [ ] WASM volunteer build (`nanlm_shard.wasm`).
 - [ ] 4–16 Boolean experts with a branch-table router.
 - [ ] Evolutionary search over `BOOL.n` sequences and masks.
 - [ ] Tsetlin clause learner as a second model family.
 - [ ] Model zoo with tiny, inspectable models.
 - [ ] Ablations: D, context, binding function, bundling, experts.
 
-**Exit gate:** at least one task where a learned circuit beats a random-mask
-baseline, or a clear negative result.
+**Exit gate:** a shard-trained slot model that is compiled, evaluated, and
+published as a generation, with an exact merge gate and a model card.
+
+**Current result:** the slot memory wins bits-per-byte (2.72 vs 3.13) and loses
+top-1 (51.6% vs 55.5%) to the in-repo interpolated n-gram on Alice. Longer
+contexts and teacher distillation are the next quality steps.
 
 ## M4 — Community surface
 

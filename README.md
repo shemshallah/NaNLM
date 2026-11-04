@@ -31,14 +31,12 @@ hyperdimensional associative memory that predicts the next character in a
 short context. It is **not** a transformer competitor. It is a substrate
 experiment with a measurable baseline.
 
-**Status:** M1, M2a, and the byte-level M2b structural base pass. The NaN16
-runtime binds three codebook vectors with position vectors, bundles them by
-majority, hashes the encoded query, and classifies it. The 2,048-bit
-byte-level model runs 32 held-out contexts on `nanlm_vm` in ~140M steps and
-matches the C adapter on every predicted byte and query hash. The honest
-result on 128 held-out contexts is **26.6% top-1 / 5.50 bits-per-byte vs 50.0%
-/ 3.85 for an order-3 n-gram**; this is a structural base, not a competitive
-LM.
+**Status:** M1, M2a, M2b, and the M3 simplex slot memory pass. The NaN16
+runtime runs the byte-level class memory (26.6% top-1 / 5.50 BPC) and the new
+slot memory (**51.6% top-1 / 2.72 BPC** vs the in-repo interpolated n-gram
+**55.5% / 3.13 BPC** on 128 held-out contexts). The slot memory wins
+bits-per-byte and loses top-1 on this small corpus; the distributed plan is
+how it scales.
 
 ## What this is
 
@@ -103,10 +101,22 @@ query-vector hash gate:
 sh tools/build_ctx.sh
 ```
 
-To run the byte-level M2b language-model base on `data/alice_excerpt.txt`:
+To run the byte-level M2b class-memory base on `data/alice_excerpt.txt`:
 
 ```sh
 sh tools/build_lm.sh
+```
+
+To run the M3 simplex slot memory (one prototype per observed 3-gram):
+
+```sh
+sh tools/build_slot.sh
+```
+
+To prove additive shard merge (`A+B == B+A` byte-for-byte):
+
+```sh
+sh tools/build_shard.sh
 ```
 
 M2a output is `CC HHHHHHHH`: two hex class digits, a space, and the FNV-1a hash
@@ -135,6 +145,7 @@ The tests verify the parts that must not drift:
 - [NaN16 study](docs/NAN16_STUDY.md) — the word format and its constraints, with provenance.
 - [Foundations](docs/FOUNDATIONS.md) — the full design argument.
 - [Keystone and supports](docs/KEYSTONE.md) — the stable core and the replaceable model parts.
+- [Distributed training](docs/DISTRIBUTED.md) — reporam/repovram shards, volunteers, and the S3 path.
 - [Model 0](docs/MODEL_0.md) — a concrete, buildable first model.
 - [M2 plan](docs/M2_PLAN.md) — context binding, a real corpus, and negative gates.
 - [C adapter](docs/ADAPTER.md) — the S6 boundary and the `.nan` compiler.

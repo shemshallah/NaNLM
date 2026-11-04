@@ -4,7 +4,7 @@ LDFLAGS ?=
 
 BUILD := build
 
-.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check lane-check
+.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check shard-check lane-check
 
 all: test
 
@@ -38,6 +38,12 @@ $(BUILD)/nanlm_asm: tools/nanlm_asm.c src/nanlm_asm.c include/nanlm_asm.h includ
 $(BUILD)/nanlm_vm: tools/nanlm_vm.c src/nanlm_vm.c include/nanlm_vm.h include/nan16_word.h | $(BUILD)
 	$(CC) $(CFLAGS) tools/nanlm_vm.c src/nanlm_vm.c -o $@ $(LDFLAGS)
 
+$(BUILD)/nanlm_slot_train: tools/nanlm_slot_train.c src/nanlm_slot.c include/nanlm_slot.h include/nan16_word.h | $(BUILD)
+	$(CC) $(CFLAGS) tools/nanlm_slot_train.c src/nanlm_slot.c -o $@ $(LDFLAGS) -lm
+
+$(BUILD)/nanlm_shard: tools/nanlm_shard.c src/nanlm_shard.c include/nanlm_shard.h | $(BUILD)
+	$(CC) $(CFLAGS) tools/nanlm_shard.c src/nanlm_shard.c -o $@ $(LDFLAGS)
+
 test: $(BUILD)/test_word $(BUILD)/test_vec $(BUILD)/test_model $(BUILD)/test_ctx
 	./$(BUILD)/test_word
 	./$(BUILD)/test_vec
@@ -68,5 +74,14 @@ model-lm: $(BUILD)/nanlm_lm_train
 model-lm-check: $(BUILD)/nanlm_lm_train
 	sh tools/build_lm.sh
 
+model-slot: $(BUILD)/nanlm_slot_train
+	./$(BUILD)/nanlm_slot_train --out models/nanlm_slot.nas --expected models/nanlm_slot.expected --manifest models/nanlm_slot.manifest
+
+model-slot-check: $(BUILD)/nanlm_slot_train
+	sh tools/build_slot.sh
+
+shard-check: $(BUILD)/nanlm_shard
+	sh tools/build_shard.sh
+
 clean:
-	rm -rf $(BUILD) models/nanlm0.nas models/nanlm0.nan models/nanlm0.expected models/nanlm0.manifest models/nanlm_ctx.nas models/nanlm_ctx.nan models/nanlm_ctx.expected models/nanlm_ctx.manifest models/nanlm_lm.nas models/nanlm_lm.nan models/nanlm_lm.expected models/nanlm_lm.manifest
+	rm -rf $(BUILD) models/nanlm0.nas models/nanlm0.nan models/nanlm0.expected models/nanlm0.manifest models/nanlm_ctx.nas models/nanlm_ctx.nan models/nanlm_ctx.expected models/nanlm_ctx.manifest models/nanlm_lm.nas models/nanlm_lm.nan models/nanlm_lm.expected models/nanlm_lm.manifest models/nanlm_slot.nas models/nanlm_slot.nan models/nanlm_slot.expected models/nanlm_slot.manifest

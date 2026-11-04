@@ -2,6 +2,22 @@
 
 Short, dated entries. Negative results stay in.
 
+## 2026-11-03 — simplex slot memory
+
+One prototype per observed 3-gram; 255-bit simplex codewords in three slots;
+nearest-key retrieval; majority next byte.
+
+| model | top-1 | BPC |
+|---|---:|---:|
+| slot memory (3832 keys) | 51.6% | **2.72** |
+| in-repo interpolated n-gram | **55.5%** | 3.13 |
+
+The slot memory wins bits-per-byte and loses top-1 on 25 KB of Alice. The
+important architectural change is that training is now **additive counting**:
+a shard is `(3-gram, next byte, count)`, and merge is integer addition.
+`A+B == B+A` byte-for-byte (`make shard-check`). This is the volunteer/S3
+training unit.
+
 ## 2026-11-03 — M2b calibrated evaluation
 
 128 held-out contexts, temperature calibrated on a disjoint 128-context slice.

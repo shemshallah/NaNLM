@@ -174,6 +174,8 @@ Next supports:
 | M1 trainer | `src/nanlm_model.c`, `tools/nanlm_train.c` |
 | M2a context | `src/nanlm_ctx.c`, `tools/nanlm_ctx_train.c` |
 | M2b LM | `src/nanlm_lm.c`, `tools/nanlm_lm_train.c` |
+| M3 slot memory | `src/nanlm_slot.c`, `tools/nanlm_slot_train.c` |
+| additive shards | `src/nanlm_shard.c`, `tools/nanlm_shard.c` |
 | runtime template | `src/nanlm_ctx.c` (`nanlm_runtime_source`) |
 | corpus | `data/alice_excerpt.txt` |
 | gates | `tools/build_model.sh`, `build_ctx.sh`, `build_lm.sh` |
@@ -193,16 +195,17 @@ Next supports:
 
 ## Next three supports
 
-1. **Top-k decoding.** Nearest-1 leaves information on the table. A k-nearest
-   class vote is the next decoder experiment; it can keep the same prototypes.
-2. **Context-aware memory.** Hash buckets beat k-means and reservoir exemplars.
-   A context-aware hash or a learned partition is the next memory experiment.
+1. **Teacher distillation.** Store a small teacher's next-byte distribution in
+   the additive memory instead of raw corpus counts. This is the path to a
+   top-1 win at scale.
+2. **Shard-to-slot compile.** Compile the slot model directly from merged
+   shards, not from a local corpus build.
 3. **Seal/loader.** FNV A/B/C over the model words, a `.nan` loader that
    rejects corruption, and a model card that names the failure modes.
 
-Calibrated HDC decoding is implemented: class-level log-sum-exp with a
-temperature selected on a disjoint 128-context slice. The model still loses to
-the n-gram, and the card says so.
+Calibrated HDC decoding is implemented. The slot memory wins bits-per-byte
+(2.72 vs 3.13) but loses top-1 (51.6% vs 55.5%) on Alice. See
+`docs/DISTRIBUTED.md` for the volunteer/S3 training plan.
 
 Only after those should the project try a router, learned `BOOL.n` circuits, or
 a larger D.

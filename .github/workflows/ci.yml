@@ -18,5 +18,9 @@ jobs:
         run: make model-check
       - name: M2a context gate
         run: make model-ctx-check
+      - name: shard merge gate
+        run: make shard-check
+      - name: simplex slot memory gate
+        run: make model-slot-check
       - name: byte-level LM gate
         run: make model-lm-check

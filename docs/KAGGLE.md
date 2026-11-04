@@ -110,6 +110,25 @@ A pure Qwen teacher only emits at token boundaries. If the pure student is
 bad but the teacher card passes, build the hybrid without re-running 7B:
 
 ```python
+import subprocess, sys
+subprocess.run(["git", "-C", "/kaggle/working/NaNLM", "pull", "--ff-only"],
+               check=True)
+subprocess.run([sys.executable,
+                "/kaggle/working/NaNLM/kaggle_hybrid.py"], check=True)
+```
+
+Or, from a shell cell:
+
+```python
+!git -C /kaggle/working/NaNLM pull --ff-only
+!python /kaggle/working/NaNLM/kaggle_hybrid.py
+```
+
+This writes `/kaggle/working/qwen7b_hybrid_run.tgz` and does not load Qwen.
+
+The manual version is:
+
+```python
 !cd /kaggle/working/NaNLM && \
   SIZE=$(wc -c < data/alice_excerpt.txt) && \
   TRAIN_END=$((SIZE * 85 / 100)) && \

@@ -10,7 +10,12 @@ bits 1536
 calib_n 128
 eval_n 128
 alpha 1.000000
+stream_n 4497
+stream_top1 49.054926
+stream_bpc 2.959344
+stream_ngram_top1 48.143207
+stream_ngram_bpc 3.419624
 hdc_top1 52.343750
-hdc_bpc 2.670342
+hdc_bpc 2.660842
 ngram_top1 55.468750
 ngram_bpc 3.130387

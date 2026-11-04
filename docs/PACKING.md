@@ -164,13 +164,20 @@ conformance contract.
 
 ## Status
 
-- Packed page reader/writer: design only.
-- Native kernels: not wired; VM remains sole runtime.
+- Packed data-page writer/reader: implemented for neutral data words in
+  `tools/nanlm_pack_pages.py`; `make pack-check` round-trips 10,000 payloads,
+  verifies the page hash, and proves the packed body is smaller than full
+  64-bit words. Code/control pages still use full NaN words.
+- Native popcount/NEON kernel: implemented in `src/nanlm_fast.c`, tested
+  against a scalar reference, and used by the C slot adapter. It is not yet a
+  VM loader or a WASM SIMD path.
+- VM conformance: the VM is still the only runtime; a fast engine that claims
+  bit-exactness must hash-match the VM per generation.
 - Additive HDC counters: design; slot memory uses bit prototypes.
 - Random Indexing: design.
 - T1 mixer: first C implementation, static mixer loses BPC.
 - T2 interpolation: design.
 - T3: not started.
 
-The next implementation slice is the page packer plus a scalar POPCNT kernel
-that is bit-exact against `nanlm_vm` on the existing `.nan` images.
+The next implementation slice is a native slot evaluator that loads the packed
+prototype pages and matches `nanlm_vm` query hashes byte-for-byte.

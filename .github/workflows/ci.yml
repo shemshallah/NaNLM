@@ -38,6 +38,8 @@ jobs:
         run: make eval-check
       - name: multi-order mixer smoke gate
         run: make mixer-check
+      - name: bit-plane page packer gate
+        run: make pack-check
       - name: 8-byte / 16-slot student gate
         run: make slot8-check
       - name: teacher shard gate

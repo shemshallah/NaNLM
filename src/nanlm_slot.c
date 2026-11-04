@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "nan16_word.h"
+#include "nanlm_fast.h"
 
 static uint32_t codebook[NANLM_SLOT_N * 256 * NANLM_SLOT_CW];
 static int codebook_ready = 0;
@@ -88,9 +89,8 @@ static uint32_t fnv_key(const uint32_t *w, uint32_t n) {
 }
 
 static uint32_t hamming_key(const uint32_t *a, const uint32_t *b) {
-    uint32_t d = 0, i;
-    for (i = 0; i < NANLM_SLOT_VW; i++) d += nan16_popcount32(a[i] ^ b[i]);
-    return d;
+    /* Native POPCNT/NEON kernel; the VM remains the differential oracle. */
+    return nanlm_fast_hamming32(a, b, NANLM_SLOT_VW);
 }
 
 static int cmp_u32(const void *a, const void *b) {

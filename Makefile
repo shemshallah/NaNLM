@@ -4,7 +4,7 @@ LDFLAGS ?=
 
 BUILD := build
 
-.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check shard-check teacher-check regime-check layers-check lane-check manifest
+.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check shard-check teacher-check regime-check layers-check lut-check lane-check manifest
 
 all: test
 
@@ -55,6 +55,9 @@ test: $(BUILD)/test_word $(BUILD)/test_vec $(BUILD)/test_model $(BUILD)/test_ctx
 
 model: $(BUILD)/nanlm_train
 	./$(BUILD)/nanlm_train --out models/nanlm0.nas --expected models/nanlm0.expected --manifest models/nanlm0.manifest
+
+lut-check: $(BUILD)/nanlm_asm $(BUILD)/nanlm_vm
+	sh tools/build_lut.sh
 
 layers-check: $(BUILD)/nanlm_asm $(BUILD)/nanlm_vm
 	./$(BUILD)/nanlm_asm tests/layers.nas $(BUILD)/layers.nan

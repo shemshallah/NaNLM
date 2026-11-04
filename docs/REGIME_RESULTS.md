@@ -51,14 +51,37 @@ selection can help**, not just execute.
 - The mixed task is not significant at this sample size.
 - The 3-gate tree is tiny; scaling is unknown.
 
+## NaN16 export
+
+A learned routed tree was compiled to `.nas` and run on `nanlm_vm`:
+
+```sh
+sh tools/build_lut.sh
+```
+
+Output:
+
+```
+lut_gate: PASS (256 routed LUT outputs, 256 lines)
+```
+
+The seed-2 tree is:
+
+```
+route 0: (n1,n2,n3) = (1,4,1)
+route 1: (n1,n2,n3) = (4,6,13)
+router: x0
+```
+
+The VM executes 6,278 steps for all 256 inputs, `rc=3`, no trap, and every
+output matches the Python model. This proves the compiler/runtime bridge; it
+does not prove language-model quality.
+
 ## Next tests
 
 1. Parameter-matched control: a fixed model with twice the gates, at twice the
    inference cost.
 2. 20+ seeds and 64/128/192 train sizes.
-3. Compile a learned regime tree to `.nas` and run it on `nanlm_vm` for all
-   256 inputs.
-4. Replace the synthetic task with an 8×8 binary digit task.
-5. Add a LUT feature layer in front of the slot memory.
-
-The result is promising, not conclusive. The next gate is the NaN16 export.
+3. Replace the synthetic task with an 8×8 binary digit task.
+4. Add a LUT feature layer in front of the slot memory.
+5. Scale the routed tree from 3 gates to 32–128 gates and measure capacity.

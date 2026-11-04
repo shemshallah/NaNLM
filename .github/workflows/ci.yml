@@ -16,6 +16,8 @@ jobs:
         run: make lane-check
       - name: layer interpretation gate
         run: make layers-check
+      - name: routed LUT model gate
+        run: make lut-check
       - name: self-modifying regime gate
         run: make regime-check
       - name: M1 model gate

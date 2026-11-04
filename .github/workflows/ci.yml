@@ -20,6 +20,8 @@ jobs:
         run: make model-ctx-check
       - name: shard merge gate
         run: make shard-check
+      - name: teacher shard gate
+        run: make teacher-check
       - name: simplex slot memory gate
         run: make model-slot-check
       - name: byte-level LM gate

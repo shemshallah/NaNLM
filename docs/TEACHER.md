@@ -1,116 +1,173 @@
-# Getting a smart base
+# Teacher selection
 
 A public model needs to be smart immediately. The fastest honest route is
 **teacher distillation into the additive slot memory**, not training a
 transformer inside NaN16.
 
-## Why not train the NaN16 VM directly
+This document picks the teacher by role, not by hype.
 
-Backprop through `nanlm_vm` would be slow, fragile, and would put floating
-point back into the critical path. The substrate is good at inference and
-counting, not at dense gradient descent.
+## The candidate matrix
 
-## The two-model release
+| candidate | params | license | byte-aligned? | causal? | role |
+|---|---:|---|---|---|---|
+| Qwen2.5-0.5B-Instruct | 494M | Apache-2.0 | no (BPE) | yes | bootstrap teacher |
+| Qwen2.5-1.5B-Instruct | 1.54B | Apache-2.0 | no (BPE) | yes | stronger bootstrap |
+| Qwen2.5-7B-Instruct | 7.6B | Apache-2.0 | no (BPE) | yes | primary teacher |
+| Qwen2.5-14B-Instruct | 14.8B | Apache-2.0 | no (BPE) | yes | high-quality, expensive |
+| SmolLM2-360M-Instruct | 362M | Apache-2.0 | no (BPE) | yes | tiny bootstrap |
+| SmolLM2-1.7B-Instruct | 1.71B | Apache-2.0 | no (BPE) | yes | small primary |
+| TinyLlama-1.1B-Chat | 1.1B | Apache-2.0 | no (BPE) | yes | fallback |
+| ByT5-small | ~300M | Apache-2.0 | yes | no (encoder-decoder) | not a streaming teacher |
+| CANINE-s | ~120M | Apache-2.0 | yes | no (encoder) | not a streaming teacher |
+| Llama-3.2-1B | 1.2B | Llama license | no | yes | avoid for an Apache artifact |
+| Qwen2.5-3B | 3.1B | “other” | no | yes | avoid; license ambiguity |
+| char GRU (ours) | 2–10M | Apache-2.0 | yes | yes | CI/dev teacher |
+| byte-level transformer (ours) | 10–40M | Apache-2.0 | yes | yes | long-term teacher |
 
-1. **Teacher** — a small byte-level neural model (GRU/LSTM/transformer) trained
-   on a public corpus. It runs on a runner or a volunteer GPU, not on the
-   phone. Its weights can live in repovram.
-2. **Student** — a simplex slot memory distilled from the teacher. It runs on
-   `nanlm_vm`, trains by additive shards, and is the open artifact.
+The two non-negotiables:
 
-The teacher is the quality ceiling. The student inherits its next-byte
-distribution for every observed context and generalizes by Hamming distance.
+1. **Apache-2.0 or public domain.** The student is an open artifact; its
+   teacher should not add a license cloud.
+2. **Causal next-byte signal.** Encoder-only or span-denoising models
+   (ByT5, CANINE) are byte-aligned but not streaming; scoring every next byte
+   requires a decoder pass per position.
 
-## Byte alignment matters
+## Bootstrap teacher: Qwen2.5-0.5B-Instruct
 
-A BPE LLM is not a byte-level teacher. Its next-token distribution does not map
-cleanly to the next byte at token boundaries. Use a **byte-level teacher**
-(char GRU/LSTM/transformer) so every target is a byte distribution.
+Why:
 
-If a BPE teacher is used, the distillation must explicitly marginalize token
-probabilities over their byte spellings and handle boundaries. That is a later
-optimization, not the first base.
+- Apache-2.0.
+- 494M params; Q4_K_M is roughly 300–400 MB.
+- Runs on a standard GitHub runner without paging.
+- Strong enough to produce a smart byte distribution on natural text.
+- A 1.5B variant is a drop-in upgrade when a runner has room.
+
+Its weakness: it is a BPE model, so the next-token distribution must be
+marginalized to the next byte. That is acceptable for the bootstrap.
+
+## Primary teacher: Qwen2.5-7B-Instruct
+
+Why:
+
+- Apache-2.0.
+- 7.6B params; Q4_K_M is roughly 4.3–4.7 GB.
+- Fits a 7 GB runner with paging and a bounded cache.
+- Fits repovram as a paged teacher: the same tier that holds a 30B deeprepo
+  model can hold a 7B teacher comfortably.
+- Better long-range context and semantics than 0.5B/1.5B.
+
+This is the "smart base" for the first serious generation. The teacher runs on
+a runner or GPU farm, never on the phone. The student is what ships.
+
+## Long-term teacher: our own byte-level causal transformer
+
+The BPE marginalization is a bridge, not the destination. The durable teacher
+should be:
+
+- **byte-level** — every target is exactly `P(next byte | prefix)`;
+- **causal** — one forward pass gives all next-byte logits;
+- **10–40M params** — trainable on a single GPU, cheap enough for volunteers;
+- **trained on public-domain text** — Project Gutenberg / PG-19, not a
+  share-alike corpus, so the artifact is clean;
+- **Apache-2.0 code and weights** — no third-party model license.
+
+A 12-layer, 384-dim byte transformer with 512-byte context is a good first
+target. A 2-layer GRU with 512 hidden is the CPU/CI fallback.
+
+This teacher can be improved by volunteers with GPU time. The student is
+re-distilled after each teacher generation.
+
+## BPE-to-byte marginalization
+
+If the teacher is BPE, distill only at **token boundaries**:
+
+1. Tokenize the prefix.
+2. Run the teacher; get `P(next token = t | prefix)`.
+3. Keep the top-k tokens.
+4. For each token, take its first byte `b = spell(t)[0]`.
+5. `P(next byte = b) = sum_{t: spell(t)[0]=b} P(t)`.
+
+This is exact for the first byte of the next token. It ignores the case where
+the context ends inside a token. That is acceptable for a bootstrap; the
+byte-level teacher removes the limitation.
+
+Do not pretend a BPE distribution is a full byte distribution. Label the
+student card accordingly.
+
+## Why not the obvious alternatives
+
+- **ByT5 / CANINE**: byte-aligned but non-causal. Scoring a corpus requires a
+  decoder pass per position, which is far more expensive than one causal
+  forward pass.
+- **Llama 3.2**: strong, but the license is not Apache. Keep the artifact
+  clean.
+- **Qwen2.5-3B**: license marked “other”; avoid when 1.5B and 7B are Apache.
+- **30B+ teachers**: better quality, but the distillation throughput and
+  repovram pressure are not worth it for the first generation. Scale after the
+  student pipeline works.
+- **A random/n-gram teacher**: not smart; it cannot beat the n-gram baseline
+  that the student is supposed to beat.
 
 ## Distillation shard
 
-A teacher shard is the same additive shape as a corpus shard, with integer
-weights instead of raw counts:
+The teacher shard is additive, like the corpus shard:
 
 ```
 (context key, next byte, weight)
 ```
 
-For each context, keep the top-k bytes and quantize their probabilities to
-16-bit weights. Merge is still addition. A context may have several records
-with different next bytes.
+- `context key`: 3 bytes for the current runtime, 8 bytes for the next scale.
+- `weight`: quantized teacher probability, 16-bit.
+- top-k bytes per context, k = 4–8.
+- merge is integer addition; shard order does not matter.
 
-The student compiles these records into prototypes exactly as it does corpus
-counts. Top-1 is the teacher's argmax for seen contexts; unseen contexts use
-the nearest simplex key.
+The student compiles the shard into one simplex-coded prototype per context.
+Top-1 is the teacher argmax for seen contexts; unseen contexts use the nearest
+simplex key.
 
-## Context length
+## Cost model
 
-Start with 3 bytes to match the current `nanlm_slot` runtime. The first
-teacher can be a small byte-level model conditioned on 3 bytes (an embedding
-MLP) or a sequence model evaluated with a 3-byte prefix.
+For a 10 MB corpus, one teacher forward pass per byte is expensive if done
+naively. Use teacher forcing over chunks:
 
-The next scale is 8 slots:
+- batch the corpus into windows of 512–2048 bytes;
+- one forward pass yields logits for every position;
+- marginalize to bytes;
+- emit top-k records.
 
-- key = 8 × 255-bit simplex codewords = 2040 bits = 64 words;
-- prototype table = top-K contexts × 64 words;
-- runtime scans K prototypes, exactly like the current slot runtime.
+On a 0.5B teacher, a 10 MB corpus is a few GPU-minutes or tens of CPU-minutes.
+On a 7B teacher, use a GPU farm or a long runner shift. The work is shardable
+by corpus range, so volunteers can contribute.
 
-That is a change of `SW` from 3 to 8 and a 64-bit context key in the shard
-format. It does not change the training rule or the merge rule.
+## Teacher evaluation gate
 
-## Sparse VRAM placement
+Before distilling, measure the teacher on the same 128-context split:
 
-| tier | contents |
-|---|---|
-| repovram | teacher weights (optional), student prototype matrix, codebook, labels, hot `.nan` |
-| reporam | teacher distribution shards, merge manifests, leases, eval cards |
-| runner/GPU | teacher inference, shard generation |
-| phone | `nanlm_vm` + hot `.nan` |
+- top-1 next-byte accuracy after marginalization;
+- bits/byte after marginalization;
+- comparison to the in-repo interpolated n-gram.
 
-The teacher can disappear after distillation; the student is the durable open
-artifact. The teacher weights stay in repovram as provenance if there is room.
+If the teacher does not beat the n-gram, distillation cannot win. Publish the
+teacher card, not just the student.
 
-## Distillation pipeline
+## Recommended first release
 
-```
-corpus shard
-   -> teacher inference (runner/GPU)
-   -> top-k byte distribution
-   -> additive shard (context, byte, weight)
-   -> reporam
-   -> merge
-   -> slot compile
-   -> repovram generation
-   -> nanlm_vm
-```
+1. Teacher: Qwen2.5-0.5B-Instruct Q4.
+2. Corpus: Project Gutenberg public-domain text, 10 MB.
+3. Context: 3 bytes for the current slot runtime.
+4. Distill top-4 bytes per context.
+5. Student: slot memory, compile to `.nan`, run on `nanlm_vm`.
+6. Report teacher and student top-1/BPC against the n-gram.
 
-## Gates
-
-- Teacher top-1/BPC on a held-out split.
-- Student top-1/BPC after distillation, same split.
-- Student must match the C adapter on every emitted byte/hash.
-- A shuffled-teacher negative gate: permute the teacher's byte labels; the
-  student must lose quality, proving the distillation is real.
-- A shard merge gate: `A+B == B+A`.
+Then repeat with Qwen2.5-7B and an 8-byte student.
 
 ## What this buys
 
-- **Smart immediately** — the teacher is a pretrained/trained neural model.
-- **Open student** — the artifact is a manifest + `.nan` image + shards.
-- **Volunteer-trainable** — teacher inference is parallel and shard-local.
-- **Sparse-VRAM friendly** — only the hot prototype table must be paged.
+- **Smart immediately** — a pretrained Apache teacher supplies the signal.
+- **Open student** — shards + manifest + `.nan` + Apache code.
+- **Volunteer-trainable** — teacher inference is shard-local.
+- **Sparse-VRAM friendly** — only the hot student table must be paged.
 - **No backprop in NaN16** — the VM only runs inference.
 
-## Open questions
-
-1. What is the smallest byte-level teacher that beats the n-gram by a useful
-   margin on a 1–10 MB corpus?
-2. How many top-k bytes per context are worth storing?
-3. Does teacher distillation preserve its advantage after slot quantization?
-4. How much does 8-slot context improve over 3-slot on the same teacher?
-5. Can the teacher run in WASM/WebGPU for volunteers, or only on runners?
+The teacher is the quality ceiling. The student is the durable artifact. The
+repo is the identity. The store is replaceable.

@@ -29,6 +29,11 @@ from token_shard import read as read_ntt  # noqa: E402
 TOKEN_MAX = 1 << 18
 
 
+def unpack(ctx: int, k: int) -> list[int]:
+    return [(ctx >> (18 * (k - 1 - i))) & (TOKEN_MAX - 1)
+            for i in range(k)]
+
+
 def pack(ids: list[int], end: int, k: int) -> int | None:
     if end < k:
         return None
@@ -111,6 +116,8 @@ def main() -> int:
     parser.add_argument("--corpus", required=True)
     parser.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
     parser.add_argument("--train-frac", type=float, default=0.85)
+    parser.add_argument("--max-tokens", type=int, default=0,
+                        help="optional token cap matching teacher run")
     args = parser.parse_args()
 
     try:
@@ -122,6 +129,8 @@ def main() -> int:
     text = Path(args.corpus).read_text(encoding="utf-8")
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     ids = tokenizer.encode(text, add_special_tokens=False)
+    if args.max_tokens and len(ids) > args.max_tokens:
+        ids = ids[:args.max_tokens]
     vocab = int(tokenizer.vocab_size)
     if max(ids) >= TOKEN_MAX:
         print("token-student: vocabulary exceeds 18 bits", file=sys.stderr)
@@ -131,10 +140,22 @@ def main() -> int:
     if ctx_len != 3:
         print("token-student: expected 3-token shard", file=sys.stderr)
         return 1
-    teacher: dict[int, dict[int, int]] = defaultdict(dict)
+    teacher3: dict[int, dict[int, int]] = defaultdict(dict)
     for ctx, nxt, weight in recs:
-        old = teacher[ctx].get(nxt, 0)
-        teacher[ctx][nxt] = old + weight
+        old = teacher3[ctx].get(nxt, 0)
+        teacher3[ctx][nxt] = old + weight
+    # Derive exact lower-order teacher distributions from the 3-token shard.
+    teacher2: dict[int, dict[int, int]] = defaultdict(dict)
+    teacher1: dict[int, dict[int, int]] = defaultdict(dict)
+    teacher0: dict[int, int] = defaultdict(int)
+    for ctx3, bucket in teacher3.items():
+        t = unpack(ctx3, 3)
+        c2 = (t[1] << 18) | t[2]
+        c1 = t[2]
+        for nxt, weight in bucket.items():
+            teacher2[c2][nxt] = teacher2[c2].get(nxt, 0) + weight
+            teacher1[c1][nxt] = teacher1[c1].get(nxt, 0) + weight
+            teacher0[nxt] += weight
 
     train_tokens = int(len(ids) * args.train_frac)
     t1, t2, t3 = defaultdict(lambda: defaultdict(int)), \
@@ -147,9 +168,9 @@ def main() -> int:
     total = sum(unigram.values())
 
     eval_n = 0
+    eval_tok_ids: list[int] = []
     t_correct = t_bits = ng_correct = ng_bits = hy_correct = hy_bits = 0.0
-    exact = 0
-    exact_n = 0
+    exact3 = exact2 = exact1 = 0
     for i in range(train_tokens, len(ids) - 1):
         c3 = pack(ids, i + 1, 3)
         c2 = pack(ids, i + 1, 2)
@@ -158,14 +179,18 @@ def main() -> int:
             continue
         actual = ids[i + 1]
         eval_n += 1
-        bucket = teacher.get(c3)
+        eval_tok_ids.append(actual)
+        bucket = teacher3.get(c3)
         if bucket:
-            exact += 1
-            exact_n += 1
+            exact3 += 1
             p, best = teacher_bucket_prob(bucket, actual, vocab)
             t_bits += -math.log2(p)
             if best == actual:
                 t_correct += 1
+        elif c2 in teacher2:
+            exact2 += 1
+        elif c1 in teacher1:
+            exact1 += 1
 
         p_ng, best_ng = ngram_prob([c3, c2, c1], actual,
                                    [t3, t2, t1], unigram, total, vocab)
@@ -173,25 +198,48 @@ def main() -> int:
         if best_ng == actual:
             ng_correct += 1
 
+        p_t3, b_t3 = teacher_bucket_prob(bucket, actual, vocab) if bucket else (0.0, 0)
+        p_t2, b_t2 = teacher_bucket_prob(teacher2[c2], actual, vocab) if c2 in teacher2 else (0.0, 0)
+        p_t1, b_t1 = teacher_bucket_prob(teacher1[c1], actual, vocab) if c1 in teacher1 else (0.0, 0)
         if bucket:
-            p_hy, best_hy = teacher_bucket_prob(bucket, actual, vocab)
+            p_hy = 0.55 * p_t3 + 0.25 * (p_t2 or p_ng) + 0.10 * (p_t1 or p_ng) + 0.10 * p_ng
+            best_hy = b_t3
+        elif c2 in teacher2:
+            p_hy = 0.55 * p_t2 + 0.25 * (p_t1 or p_ng) + 0.20 * p_ng
+            best_hy = b_t2
+        elif c1 in teacher1:
+            p_hy = 0.55 * p_t1 + 0.45 * p_ng
+            best_hy = b_t1
         else:
             p_hy, best_hy = p_ng, best_ng
         hy_bits += -math.log2(p_hy)
         if best_hy == actual:
             hy_correct += 1
 
-    def show(name, bits, correct, n):
-        n = n or 1
-        print(f"{name}: top1={100.0 * correct / n:.2f}% "
-              f"bpc={bits / n:.4f}")
+    eval_bytes = len(tokenizer.decode(
+        eval_tok_ids, skip_special_tokens=False,
+        clean_up_tokenization_spaces=False
+    ).encode("utf-8", errors="replace"))
+    if eval_bytes <= 0:
+        eval_bytes = eval_n
 
+    def show(name, bits, correct, n, n_bytes):
+        n = n or 1
+        n_bytes = n_bytes or 1
+        print(f"{name}: top1={100.0 * correct / n:.2f}% "
+              f"bpt={bits / n:.4f} bpc={bits / n_bytes:.4f}")
+
+    cov_any = exact3 + exact2 + exact1
     print(f"token-student: tokens={len(ids)} train={train_tokens} "
-          f"eval={eval_n} teacher_exact={exact} "
-          f"coverage={100.0 * exact / eval_n:.2f}%")
-    show("teacher_exact", t_bits, t_correct, exact_n)
-    show("token_ngram", ng_bits, ng_correct, eval_n)
-    show("teacher_plus_backoff", hy_bits, hy_correct, eval_n)
+          f"eval_tokens={eval_n} eval_bytes={eval_bytes} "
+          f"teacher3={len(teacher3)} teacher2={len(teacher2)} "
+          f"teacher1={len(teacher1)} "
+          f"hit3={exact3} ({100.0 * exact3 / max(1, eval_n):.1f}%) "
+          f"hit123={cov_any} ({100.0 * cov_any / max(1, eval_n):.1f}%)")
+    show("teacher_exact3", t_bits, t_correct, exact3,
+         int(round(eval_bytes * (exact3 / max(1, eval_n)))))
+    show("token_ngram", ng_bits, ng_correct, eval_n, eval_bytes)
+    show("teacher_plus_backoff", hy_bits, hy_correct, eval_n, eval_bytes)
     return 0
 
 

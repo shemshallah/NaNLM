@@ -43,7 +43,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
     parser.add_argument("--corpus", default="data/alice_excerpt.txt")
-    parser.add_argument("--max-tokens", type=int, default=2048)
+    parser.add_argument("--max-tokens", type=int, default=8192)
     parser.add_argument("--top-k", type=int, default=16)
     parser.add_argument("--chunk", type=int, default=64)
     parser.add_argument("--context-tokens", type=int, default=3)
@@ -100,6 +100,20 @@ def main() -> int:
         sh(cmd, log=log)
         sh([sys.executable, str(REPO / "tools/token_shard.py"),
             "stats", str(ntt)], log=log)
+        student_cmd = [
+            sys.executable, str(REPO / "tools/token_student.py"),
+            "--ntt", str(ntt),
+            "--corpus", str(corpus),
+            "--model", args.model,
+            "--max-tokens", str(args.max_tokens),
+        ]
+        proc = subprocess.run(
+            student_cmd, cwd=str(REPO), check=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        )
+        print(proc.stdout, end="", flush=True)
+        log.write(proc.stdout)
+        log.flush()
         data = json.loads(card.read_text(encoding="utf-8"))
         print(json.dumps(data, indent=2, sort_keys=True), flush=True)
         print("TOKEN TEACHER GATE:",

@@ -10,6 +10,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Python syntax
+        run: |
+          python3 -m py_compile tools/qwen_teacher.py tools/hf_teacher.py             modal_teacher.py experiments/eval_stream.py
       - name: Host tests
         run: make test
       - name: VM lane gate

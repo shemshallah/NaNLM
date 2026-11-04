@@ -197,6 +197,7 @@ The tests verify the parts that must not drift:
 - [Multi-order context mixing](docs/MIXER.md) — PAQ/lpaq-style template bank, integer mixer, and the first negative result.
 - [Packing and fast kernels](docs/PACKING.md) — bit-plane pages, VM conformance, additive HDC counters, and the T1/T2/T3 split.
 - [Qwen teacher runner](docs/QWEN.md) — the first real Qwen run, its teacher card, and why 0.5B/256 samples is not enough.
+- [Free-GPU strategy](docs/GPU.md) — Modal batch teacher inference, free-tier options, and what not to spend GPU hours on.
 - [Model 0](docs/MODEL_0.md) — a concrete, buildable first model.
 - [M2 plan](docs/M2_PLAN.md) — context binding, a real corpus, and negative gates.
 - [C adapter](docs/ADAPTER.md) — the S6 boundary and the `.nan` compiler.

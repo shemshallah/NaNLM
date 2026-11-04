@@ -26,7 +26,8 @@ for f in \
     data/code_fixture/LICENSE data/code_fixture/README.md \
     models/qwen_0.5b/card.json models/qwen_0.5b/qwen_slot8.manifest \
     models/qwen_0.5b/qwen_hybrid_slot8.manifest \
-    models/qwen_0.5b/qwen_hybrid_slot3.manifest
+    models/qwen_0.5b/qwen_hybrid_slot3.manifest \
+    modal_teacher.py tools/hf_teacher.py docs/GPU.md
 do
     if [ -f "$f" ]; then
         $HASH "$f" >> "$OUT"

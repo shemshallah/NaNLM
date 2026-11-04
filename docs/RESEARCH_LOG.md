@@ -44,19 +44,19 @@ competitive.
 
 Bigger D did not help. That points at the memory/decoder, not raw capacity.
 
-### Exemplar memory, first-K (negative)
+### Exemplar memory (negative)
 
 First K training contexts per class, nearest exemplar:
 
-| K | top-1 |
-|---:|---:|
-| 4 | 3.1% |
-| 8 | 9.4% |
-| 16 | 21.9% |
+| K | first-K | reservoir |
+|---:|---:|---:|
+| 4 | 3.1% | 15.6% |
+| 8 | 9.4% | 25.0% |
+| 16 | 21.9% | 25.0% |
 
-This is worse than the majority prototypes. First-K sampling is biased to the
-start of the corpus. A reservoir or k-means selection is the next version, not
-this one.
+Reservoir sampling is much better than first-K, but still below the majority
+centroid (34.4%). Nearest-exemplar is not automatically better. A k-means
+assignment is the next version, not this one.
 
 ### Hypotheses
 

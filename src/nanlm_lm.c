@@ -7,6 +7,13 @@
 
 #include "nanlm_runtime.h"
 
+static uint64_t splitmix64(uint64_t *state) {
+    uint64_t z = (*state += 0x9E3779B97F4A7C15ull);
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+    return z ^ (z >> 31);
+}
+
 typedef struct {
     uint32_t key;
     uint8_t next;
@@ -191,6 +198,7 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
     uint32_t *ones = NULL;
     uint32_t *total = NULL;
     uint32_t *seen = NULL;
+    uint64_t reservoir = seed ^ 0xD1B54A32D192ED03ull;
     nanlm_vec *q = NULL;
     Pair *pairs = NULL;
     size_t npairs = 0;
@@ -244,9 +252,17 @@ int nanlm_lm_train(nanlm_lm_model *m, const uint8_t *data, size_t len,
             return -1;
         }
         if (m->exemplar) {
-            uint32_t slot = seen[cls] % m->clusters;
-            nanlm_vec *dst = m->prototypes[cls * m->clusters + slot];
-            memcpy(dst->w, q->w, m->words * sizeof(*q->w));
+            uint32_t slot;
+            if (seen[cls] < m->clusters) {
+                slot = seen[cls];
+            } else {
+                uint32_t j = (uint32_t)(splitmix64(&reservoir) % seen[cls]);
+                slot = (j < m->clusters) ? j : UINT32_MAX;
+            }
+            if (slot != UINT32_MAX) {
+                nanlm_vec *dst = m->prototypes[cls * m->clusters + slot];
+                memcpy(dst->w, q->w, m->words * sizeof(*q->w));
+            }
             seen[cls]++;
         } else {
             uint32_t pidx = cls * m->clusters +

@@ -138,6 +138,7 @@ The tests verify the parts that must not drift:
 - [Community plan](docs/COMMUNITY.md) — launch sequence, hooks, and anti-patterns.
 - [Evidence](docs/EVIDENCE.md) — the gates that have actually run.
 - [Research log](docs/RESEARCH_LOG.md) — experiment matrix, including the negative results.
+- [Model card](docs/MODEL_CARD.md) — intended use, metrics, caveats, and reproduction.
 - [M1 retrospective](docs/M1_RETROSPECTIVE.md) — what the first pipeline proved, and did not.
 
 ## Relationship to NaN16

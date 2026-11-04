@@ -93,7 +93,8 @@ Contract:
 - `PROTOSHIFT` maps prototype index to class.
 
 Current: `vocab * clusters` majority prototypes, 8 per byte. An optional
-first-K exemplar mode (`--exemplar`) is a negative result in the research log.
+exemplar mode (`--exemplar`, reservoir sampling) is a negative result in the
+research log.
 
 Next supports:
 

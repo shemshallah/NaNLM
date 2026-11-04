@@ -99,7 +99,9 @@ After sparse truth tables and 2/1-token teacher backoff:
 | fixed | 2.25% | 7.31% | 81.45% | 3.1217 | 2.7324 | **2.4069** | 10.70% |
 
 The sparse truth-table fix dropped regime active fraction from 83% to 0.69%.
-The 2/1 teacher backoff raised teacher coverage from 7.3% to 81.45%.
+The 2/1 teacher backoff raised teacher coverage from 7.3% to 81.45%. A causal
+document-local token cache then reached **2.1509 BPC** in the lookup model,
+which is now the target for the HDC compression.
 
 This matches the **2.4161 BPC** token lookup target. But it is not yet a compact
 student:

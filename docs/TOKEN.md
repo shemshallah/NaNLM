@@ -192,3 +192,22 @@ This is the first token-level BPC result that beats the raw byte 3-slot model
 
 The next model must compress this lookup into a token HDC/slot memory and pay
 for its own bytes. The 2.416 BPC is a target, not a shipped result.
+
+## Document-local cache result
+
+The token lookup model was run with a strictly causal document-local cache:
+
+```
+teacher exact 3-token:       2.3916 BPC
+teacher + 2/1 backoff:       2.2912 BPC
+teacher + backoff + doc cache: 2.1509 BPC
+token n-gram:                2.7324 BPC
+```
+
+The doc cache updates only after each evaluated token. It is an online
+per-document memory, not a static model.
+
+This is the best token BPC so far. It is still a lookup/backoff evaluator, not a
+compiled student, and it does not pay for the full teacher table. The next test
+is whether the token HDC prototype plus the same causal doc cache can preserve
+this signal.

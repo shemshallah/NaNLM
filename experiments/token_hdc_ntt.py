@@ -172,6 +172,14 @@ def main() -> int:
     bits_ng = 0.0
     correct_h = 0
     bits_h = 0.0
+    correct_dy = 0
+    bits_dy = 0.0
+    doc1, doc2, doc3 = defaultdict(lambda: defaultdict(int)), \
+                       defaultdict(lambda: defaultdict(int)), \
+                       defaultdict(lambda: defaultdict(int))
+    doc1_tot, doc2_tot, doc3_tot = defaultdict(int), defaultdict(int), defaultdict(int)
+    doc_uni = defaultdict(int)
+    doc_utot = 0
 
     def bucket_prob(bucket: dict[int, int], token: int) -> float:
         total = sum(bucket.values())
@@ -245,6 +253,25 @@ def main() -> int:
         bits_h += -math.log2(p_h)
         if best_h == actual:
             correct_h += 1
+
+        # Document-local online cache. Updates only after the current token.
+        if doc_utot:
+            p_doc = hierarchical_prob(
+                actual, doc3.get(c3), doc3_tot.get(c3, 0),
+                doc2.get(c2), doc2_tot.get(c2, 0),
+                doc1.get(c1), doc1_tot.get(c1, 0),
+                doc_uni, doc_utot, vocab, taus=(1.0, 2.0, 3.0),
+            )
+            p_dy = 0.25 * p_doc + 0.75 * p_h
+        else:
+            p_dy, best_dy = p_h, best_h
+        bits_dy += -math.log2(p_dy)
+        if best_h == actual:
+            correct_dy += 1
+        doc3[c3][actual] += 1; doc3_tot[c3] += 1
+        doc2[c2][actual] += 1; doc2_tot[c2] += 1
+        doc1[c1][actual] += 1; doc1_tot[c1] += 1
+        doc_uni[actual] += 1; doc_utot += 1
         eval_n += 1
         eval_bytes += len(tok_text(actual).encode("utf-8", errors="replace"))
 
@@ -277,6 +304,7 @@ def main() -> int:
     show("teacher_backoff", correct_t, bits_t, teacher_n, teacher_bytes)
     show("token_ngram", correct_ng, bits_ng, eval_n, eval_bytes)
     show("hdc_teacher_plus_ngram", correct_h, bits_h, eval_n, eval_bytes)
+    show("hdc_plus_doc_cache", correct_dy, bits_dy, eval_n, eval_bytes)
     print(f"model_size: dense={dense_bytes} B sparse={sparse_bytes} B "
           f"ngram_fallback={ngram_bytes} B teacher_shard={teacher_bytes_all} B")
     print(f"hutter_total_bpc: dense={(bits_h + 8.0 * dense_bytes) / max(1, eval_bytes):.4f} "

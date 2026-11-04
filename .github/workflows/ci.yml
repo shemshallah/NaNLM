@@ -28,6 +28,10 @@ jobs:
         run: make model-ctx-check
       - name: shard merge gate
         run: make shard-check
+      - name: shard -> typed slot gate
+        run: make shard-slot-check
+      - name: continuous code pipeline gate
+        run: make continuous-check
       - name: teacher shard gate
         run: make teacher-check
       - name: teacher -> slot gate

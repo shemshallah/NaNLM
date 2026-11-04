@@ -32,11 +32,17 @@ short context. It is **not** a transformer competitor. It is a substrate
 experiment with a measurable baseline.
 
 **Status:** M1, M2a, M2b, and the M3 simplex slot memory pass. The NaN16
-runtime runs the byte-level class memory (26.6% top-1 / 5.50 BPC) and the new
-slot memory (**52.3% top-1 / 2.67 BPC** vs the in-repo interpolated n-gram
+runtime runs the byte-level class memory (26.6% top-1 / 5.50 BPC) and the slot
+memory (**52.3% top-1 / 2.67 BPC** vs the in-repo interpolated n-gram
 **55.5% / 3.13 BPC** on 128 held-out contexts). The slot memory wins
 bits-per-byte and loses top-1 on this small corpus; the distributed plan is
 how it scales.
+
+The continuous-training path is now closed end-to-end: pinned repository →
+license/secret-filtered chunks → additive shards → typed slot memory → `.nas` →
+`nanlm_vm`. `make continuous-check` also exercises a four-runner ring with a
+failed runner. The current code quality is a plumbing result, not a quality
+claim.
 
 ## What this is
 
@@ -119,6 +125,21 @@ To prove additive shard merge (`A+B == B+A` byte-for-byte):
 sh tools/build_shard.sh
 ```
 
+To compile additive count shards into typed slot memory and prove it matches
+the direct corpus trainer byte-for-byte:
+
+```sh
+make shard-slot-check
+```
+
+To run the full continuous code pipeline — GitHub-ready ingestion, license and
+secret gates, shards, exact merge, typed slot memory, VM diff, and a
+runner-ring failover plan:
+
+```sh
+make continuous-check
+```
+
 M2a output is `CC HHHHHHHH`: two hex class digits, a space, and the FNV-1a hash
 of the encoded query vector. The negative gates zero the position vectors,
 swap prototypes 0/1, and starve the step budget; all three must fail.
@@ -146,6 +167,7 @@ The tests verify the parts that must not drift:
 - [Foundations](docs/FOUNDATIONS.md) — the full design argument.
 - [Keystone and supports](docs/KEYSTONE.md) — the stable core and the replaceable model parts.
 - [Distributed training](docs/DISTRIBUTED.md) — reporam/repovram shards, volunteers, and the S3 path.
+- [Continuous training from GitHub](docs/CONTINUOUS.md) — code ingestion, runner ring, memory generations, and routing.
 - [Repo-anchored brains](docs/REPO_BRAIN.md) — identity vs residence, manifests, and mirrors.
 - [Smart base / teacher distillation](docs/TEACHER.md) — how to get a smart model immediately.
 - [Open-source lifecycle](docs/OPEN_SOURCE.md) — why mergeable counting is a world effort, stage by stage.

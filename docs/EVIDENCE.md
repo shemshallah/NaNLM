@@ -267,7 +267,49 @@ The pipeline is exact: teacher shard → 3-byte aggregation → typed slot model
 `.nas` → `nanlm_vm` → diff. The quality is poor because the fixture n-gram
 teacher is weak; this is a plumbing gate, not a model result.
 
-## 10. Additional checks
+## 10. Continuous code pipeline and shard -> slot compile
+
+```sh
+make shard-slot-check
+make continuous-check
+```
+
+`shard-slot-check` proves that count shards compile to exactly the same
+prototype memory as the direct corpus trainer:
+
+```
+shard-slot: shard_records=8317 keys=3832
+eval_n=128 hdc_top1=52.34% hdc_bpc=2.6703
+ngram_top1=55.47% ngram_bpc=3.1304
+shard_slot: corpus == shard compile PASS
+shard_slot: VM PASS (32 queries)
+```
+
+The two `.nas` files are byte-identical. This is the continuous-training
+invariant: a merged shard set is a model, not just a checkpoint.
+
+`continuous-check` ingests a deliberately adversarial local code fixture,
+rejects secret/generated/minified files, validates the MIT license, builds and
+merges shards, compiles typed slot memory, runs the VM, and plans a four-runner
+ring with one failed runner:
+
+```
+ingest: files=8 chunks=8 bytes=5766 skipped=4
+shard: keys=1912 records=2579 total=4901
+continuous: A+B == B+A PASS
+shard-slot: eval_n=128 hdc_top1=27.34% hdc_bpc=6.2286
+ngram_top1=26.56% ngram_bpc=5.5575
+continuous: shard -> typed slot -> VM PASS (32 queries)
+ring: runners=4 jobs=4 chunks=8 bytes=5766
+ring: simulated done=4 failed=[1]
+continuous: runner ring plan/failover/materialize/shard PASS
+```
+
+The code fixture is tiny and high-entropy; its quality numbers are a plumbing
+check, not a code-model claim. The important result is deterministic
+provenance-to-runtime closure.
+
+## 11. Additional checks
 
 - ASan + UBSan builds of `test_word`, `test_vec`, `test_model`, and `test_ctx` pass.
 - The same pipeline was run with `--dim 512 --classes 8 --queries 16` and
@@ -282,13 +324,14 @@ teacher is weak; this is a plumbing gate, not a model result.
   (52.3% vs 55.5%) on the 128-context Alice split.
 - The teacher → typed slot pipeline exists and passes plumbing, but the fixture
   teacher is not smart enough to beat the n-gram.
+- The continuous code fixture is a plumbing result; it is not a code-quality
+  result and does not beat the n-gram on BPC.
 - reporam/repovram page mapping and generation manifests are designed but not
-  implemented.
-- Teacher distillation (storing a small teacher's distribution) is not
-  implemented.
+  implemented as a live service.
 - The seal/loader path does not exist yet.
-- The 8,192-bit scale has not been retested.
+- The 8-slot student and a real Qwen teacher run have not been completed.
 - CI runs the full gates on x86-64; local gates run on aarch64.
 
-The next gate is a merged shard → slot model → `.nan` build, then teacher
-distillation and a reporam/repovram generation.
+The next gate is a real teacher (Qwen/byte-level) on a pinned code slice, an
+8-slot student, and a held-out code card. The runner-ring control plane and the
+shard→slot compile path are already in place.

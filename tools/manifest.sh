@@ -22,7 +22,8 @@ for f in \
     models/nanlm_ctx.nan models/nanlm_ctx.nas models/nanlm_ctx.manifest \
     models/nanlm_lm.nan models/nanlm_lm.nas models/nanlm_lm.manifest \
     models/nanlm_slot.nan models/nanlm_slot.nas models/nanlm_slot.manifest \
-    data/alice_excerpt.txt data/alice_full.txt data/PROVENANCE.md
+    data/alice_excerpt.txt data/alice_full.txt data/PROVENANCE.md \
+    data/code_fixture/LICENSE data/code_fixture/README.md
 do
     if [ -f "$f" ]; then
         $HASH "$f" >> "$OUT"

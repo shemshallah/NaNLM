@@ -4,7 +4,7 @@ LDFLAGS ?=
 
 BUILD := build
 
-.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check shard-check teacher-check teacher-slot-check regime-check layers-check lut-check lane-check manifest
+.PHONY: all test clean model model-check model-ctx model-ctx-check model-lm model-lm-check model-slot model-slot-check shard-check shard-slot-check teacher-check teacher-slot-check continuous-check regime-check layers-check lut-check lane-check manifest
 
 all: test
 
@@ -46,6 +46,9 @@ $(BUILD)/nanlm_shard: tools/nanlm_shard.c src/nanlm_shard.c include/nanlm_shard.
 
 $(BUILD)/nanlm_teacher: tools/nanlm_teacher.c src/nanlm_teacher.c include/nanlm_teacher.h | $(BUILD)
 	$(CC) $(CFLAGS) tools/nanlm_teacher.c src/nanlm_teacher.c -o $@ $(LDFLAGS) -lm
+
+$(BUILD)/nanlm_shard_slot: tools/nanlm_shard_slot.c src/nanlm_shard.c src/nanlm_slot.c include/nanlm_shard.h include/nanlm_slot.h include/nan16_word.h | $(BUILD)
+	$(CC) $(CFLAGS) tools/nanlm_shard_slot.c src/nanlm_shard.c src/nanlm_slot.c -o $@ $(LDFLAGS) -lm
 
 $(BUILD)/nanlm_teacher_slot: tools/nanlm_teacher_slot.c src/nanlm_slot.c src/nanlm_teacher.c include/nanlm_slot.h include/nanlm_teacher.h | $(BUILD)
 	$(CC) $(CFLAGS) tools/nanlm_teacher_slot.c src/nanlm_slot.c src/nanlm_teacher.c -o $@ $(LDFLAGS) -lm
@@ -107,6 +110,12 @@ model-slot-check: $(BUILD)/nanlm_slot_train
 
 shard-check: $(BUILD)/nanlm_shard
 	sh tools/build_shard.sh
+
+shard-slot-check: $(BUILD)/nanlm_shard_slot
+	sh tools/build_shard_slot.sh
+
+continuous-check: $(BUILD)/nanlm_shard $(BUILD)/nanlm_shard_slot $(BUILD)/nanlm_asm $(BUILD)/nanlm_vm
+	sh tools/build_continuous.sh
 
 teacher-check: $(BUILD)/nanlm_teacher
 	sh tools/build_teacher.sh

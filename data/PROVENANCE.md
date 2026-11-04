@@ -12,3 +12,11 @@ the full 151,191-byte text.
 The Gutenberg header/footer are included in the excerpt; the trainer does not
 strip them. That is deliberate: the first model should not depend on a special
 corpus cleaner.
+
+## Code fixture
+
+`data/code_fixture/` is original, MIT-licensed code written for the continuous
+pipeline gate. It is intentionally tiny and contains deliberate negative cases:
+a minified file, a generated file, and a file with fake secret material. Those
+files must be rejected by `tools/nanlm_ingest.py`. The fixture is not a
+benchmark and is not a claim about code-model quality.

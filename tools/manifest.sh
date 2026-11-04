@@ -28,7 +28,7 @@ for f in \
     models/qwen_0.5b/qwen_hybrid_slot8.manifest \
     models/qwen_0.5b/qwen_hybrid_slot3.manifest \
     modal_teacher.py tools/hf_teacher.py kaggle_qwen7b.py kaggle_hybrid.py kaggle_grid.py kaggle_token.py \
-    docs/GPU.md docs/AMD_GPU.md docs/MODAL.md docs/KAGGLE.md docs/QWEN7B.md \
+    docs/GPU.md docs/AMD_GPU.md docs/MODAL.md docs/KAGGLE.md docs/KAGGLE_DATASETS.md docs/QWEN7B.md \
     docs/TOKEN.md docs/PLASTICITY.md docs/TOKEN_HDC.md docs/SPARSE.md \
     tools/hf_token_teacher.py experiments/token_hdc.py \
     experiments/token_hdc_ntt.py experiments/sparse_dim.py \

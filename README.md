@@ -208,6 +208,7 @@ The tests verify the parts that must not drift:
 - [Sparse high-dimensional sweep](docs/SPARSE.md) — dimensions, active fraction, and noise fragility.
 - [Free-GPU strategy](docs/GPU.md) — Modal batch teacher inference, free-tier options, and what not to spend GPU hours on.
 - [Kaggle runbook](docs/KAGGLE.md) — one script for a free T4/GPU session, with teacher, hybrid backoff, and student artifacts.
+- [Kaggle dataset linking](docs/KAGGLE_DATASETS.md) — persist the token shard and mount it with `/kaggle/input/...`.
 - `kaggle_hybrid.py` — rebuild hybrid students from an existing 7B teacher shard without reloading the model.
 - `kaggle_grid.py` — CPU-only teacher-scale and 8-slot-size grid from existing shards.
 - `kaggle_token.py` — one-line Kaggle token teacher run and NTT packaging.
